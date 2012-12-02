@@ -1,0 +1,746 @@
+#ifndef _SSTL__STRING_INCLUDED
+#define _SSTL__STRING_INCLUDED
+
+#include "sstl_common.h"
+#include "atomic"
+#include "iterator"
+
+namespace SSTL_NAMESPACE {
+
+class string
+{
+    friend class _intern_holder;
+
+public:
+
+    typedef char value_type;
+    typedef unsigned size_type;
+    typedef int difference_type;
+    typedef char* iterator;
+    typedef const char* const_iterator;
+    typedef SSTL_NAMESPACE::reverse_iterator<iterator> reverse_iterator;
+    typedef SSTL_NAMESPACE::reverse_iterator<const_iterator> const_reverse_iterator;
+
+    // Private shared constant string buffer.
+    //
+    struct _buffer_type
+    {
+    public: // Data:
+
+        // Hash value, if the string is interned.
+        //
+        // Once the hash is computed, the string becomes constant and it cannot change.
+        // There is a debug check to verify this.
+        //
+        unsigned _hash;
+
+        // Capacity of the buffer in bytes
+        //
+        unsigned _capacity;
+
+        // Size of the string in the buffer
+        //
+        unsigned _size;
+
+        // Reference counter for this buffer.
+        // Zero means one singlereference, and negative value is no references.
+        // Cannot use atomic_int as not all compilers still support pods with constructors.
+        //
+        mutable volatile int _ref_count;
+
+        // Buffer with fake size for storing the string.
+        //
+        union
+        {
+            char _bytes [ 16 ];
+            sstl_uint64 _qwords [ 2 ]; // this ensures the best possible alignment for data
+        };
+
+    public:
+
+        // Object default constructor used to create an empty string buffer.
+        //
+        _buffer_type()
+            :
+              _hash(0),
+              _capacity(16),
+              _size(0),
+              _ref_count(1) // never delete static empty string
+        {
+            SSTL_STATIC_ASSERT(sizeof(_buffer_type) == 32, "Buffer structure has unexpected size"); // ensure nice alignment
+        }
+
+        // Object constructor with capacity and size specified
+        //
+        _buffer_type(unsigned capacity, unsigned size)
+            :
+              _hash(0),
+              _capacity(capacity),
+              _size(size),
+              _ref_count(0)
+        {
+        }
+
+        void _ref_increment() const
+        {
+            SSTL_NAMESPACE::atomic_int::static_fetch_and_increment(&_ref_count);
+        }
+
+        void _ref_decrement() const
+        {
+            if ( SSTL_NAMESPACE::atomic_int::static_fetch_and_decrement(&_ref_count) <= 0 )
+                delete this;
+        }
+
+    private:
+
+        // Disable those
+        _buffer_type(const _buffer_type&);
+        _buffer_type& operator=(const _buffer_type&);
+    };
+
+public: // Constants:
+
+    static const size_type npos = 0xFFFFFFFF;
+    static const unsigned _buffer_type_header_sizeof = sizeof(_buffer_type) - sizeof(sstl_uint64) * 2;
+    static const unsigned _minimum_capacity = sizeof(sstl_uint64) * 2;
+
+public:
+
+    /// Default constructor, creates an empty string
+    ///
+    string()
+    {
+        _empty_string_buffer._ref_increment();
+        _bytes = _empty_string_buffer._bytes;
+    }
+
+    /// Construct the string from the given buffer, give the buffer directly.
+    ///
+    /// This operation does not change buffer reference counter.
+    ///
+    /// \param b Buffer from which to construc the string.
+    ///
+    string(_buffer_type* b)
+    {
+        SSTL_ASSERT(b != NULL);
+        _bytes = b->_bytes;
+    }
+
+    /// Construct the string from a zero terminated character string.
+    ///
+    /// PRECONDITION: The pointer to the constant characters
+    /// should be non-NULL. Otherwise the behavior is
+    /// undefined. Likely to be a GPF. The debugging version asserts the
+    /// condition.
+    ///
+    /// POSTCONDITION: The object is created and the string associated
+    /// is equal to one given.
+    ///
+    string(const char* s)
+    {
+        DoSet(s);
+    }
+
+    string(const char* s, size_type size)
+    {
+        DoSet(s, size);
+    }
+
+    string(size_type size, char c)
+    {
+        DoSet(size, c);
+    }
+
+    template
+        <class Iterator>
+    string(Iterator from, Iterator to)
+    {
+        DoSet(from, to);
+    }
+
+    /// Copy constructor.
+    ///
+    /// The buffer is shared among the strings, so the operation is very efficient.
+    ///
+    string(const string& other)
+    {
+        DoSet(other);
+    }
+
+    /// Destructor.
+    ///
+    /// The buffer is deleted only if there is no other string pointing it.
+    ///
+    ~string()
+    {
+        _get_buffer()->_ref_decrement();
+    }
+
+public: // Methods:
+
+    iterator begin()
+    {
+        _make_unique();
+        return _bytes;
+    }
+
+    iterator end()
+    {
+        _make_unique();
+        return _bytes + size();
+    }
+
+    const_iterator begin() const
+    {
+        return _bytes;
+    }
+
+    const_iterator end() const
+    {
+        return _bytes + size();
+    }
+
+    // Get the number of characters in the string, zero character is not included.
+    //
+    size_type size() const
+    {
+        return _get_buffer()->_size;
+    }
+
+    /// Returns whether the string is empty, so its size is zero.
+    ///
+    bool empty() const
+    {
+        return size() == 0;
+    }
+
+    unsigned capacity() const
+    {
+        return _get_buffer()->_capacity;
+    }
+
+    void reserve(size_type reserved_size = 0) const;
+
+    /// Access the data of string, by standard, this is not necessarily zero terminated.
+    ///
+    const char* data() const
+    {
+        return _bytes;
+    }
+
+    /// Access zero terminated string
+    ///
+    const char* c_str() const;
+
+    string& operator=(char c)
+    {
+        _get_buffer()->_ref_decrement();
+        DoSet(c);
+        return *this;
+    }
+
+    /// Object assignment operator that takes AConstChars.
+    /// Makes the string being the same as one given.
+    ///
+    /// The implementation copies the characters from AConstChars given.
+    ///
+    /// PRECONDITION: None
+    ///
+    /// POSTCONDITION: The object is created from the AConstChars given.
+    /// If the object was initialized with some other string, and the object
+    /// was the last pointer to that string, the previous string is deleted
+    /// with operator delete.
+    ///
+    string& operator=(const char* str)
+    {
+        return assign(str);
+    }
+
+    /// Assignment operator that takes another shared string.
+    ///
+    /// Makes the string being the same as one given.
+    /// The implementation is very fast and the copying of the string is never done.
+    ///
+    string& operator=(const string& other)
+    {
+        return assign(other);
+    }
+
+    string& assign(size_type size, char c)
+    {
+        _get_buffer()->_ref_decrement();
+        DoSet(size, c);
+        return *this;
+    }
+
+    string& assign(const char* str)
+    {
+        _get_buffer()->_ref_decrement();
+        DoSet(str);
+        return *this;
+    }
+
+    string& assign(const char* str, size_type size)
+    {
+        _get_buffer()->_ref_decrement();
+        DoSet(str, size);
+        return *this;
+    }
+
+    string& assign(const string& other)
+    {
+        if (this != &other) // otherwise the string might get deleted
+        {
+            _get_buffer()->_ref_decrement();
+            DoSet(other);
+        }
+        return *this;
+    }
+
+    string& operator+=(char c)
+    {
+        return push_back(c);
+    }
+
+    string& operator+=(const char* c)
+    {
+        return append(c);
+    }
+
+    string& operator+=(const string& s)
+    {
+        return append(s);
+    }
+
+    string& push_back(char c)
+    {
+        char* place = _append_uninitialized(1);
+        *place = c;
+        return *this;
+    }
+
+    string& append(size_type size, char c)
+    {
+        char* place = _append_uninitialized(size);
+        memset(place, c, size);
+        return *this;
+    }
+
+    string& append(const char* str)
+    {
+        const size_type len = static_cast<size_type>(strlen(str));
+        return append(str, len);
+    }
+
+    string& append(const char* str, size_type size)
+    {
+        if (size != 0)
+        {
+            char* place = _append_uninitialized(size);
+            memcpy(place, str, size);
+        }
+        return *this;
+    }
+
+    string& append(const string& other)
+    {
+        return append(other.data(), other.size());
+    }
+
+    void resize(size_type new_size);
+
+    void clear()
+    {
+        if (_bytes != _empty_string_buffer._bytes)
+        {
+            _get_buffer()->_ref_decrement();
+            _bytes = _empty_string_buffer._bytes;
+        }
+    }
+
+    static unsigned static_hash(const char* p, size_type size);
+
+    unsigned hash()
+    {
+        return static_hash(_bytes, size());
+    }
+
+    string& erase(size_type pos, size_type count);
+
+    iterator erase(const_iterator position)
+    {
+        size_type index = static_cast<size_type>(position - _bytes);
+        SSTL_ASSERT(index < size());
+        erase(index, 1);
+        return _bytes + index;
+    }
+
+    iterator erase(const_iterator first, const_iterator last)
+    {
+        SSTL_ASSERT(_bytes >= first);
+        SSTL_ASSERT(last <= _bytes + size());
+        SSTL_ASSERT(first < last);
+        size_type pos = static_cast<size_type>(first - _bytes);
+        size_type count = static_cast<size_type>(last - first);
+        erase(pos, count);
+        return _bytes + pos;
+    }
+
+    iterator insert(const_iterator where, char ch)
+    {
+        size_type pos = static_cast<size_type>(where - _bytes);
+        SSTL_ASSERT(pos <= size());
+        char* buff = _insert_uninitialized(pos, 1);
+        buff[0] = ch;
+        return buff + 1;
+    }
+
+    iterator insert(const_iterator where, size_type count, char c)
+    {
+        size_type pos = static_cast<size_type>(where - _bytes);
+        insert(pos, count, c);
+        return _bytes + pos + count;
+    }
+
+    string& insert(size_type pos, size_type count, char c)
+    {
+        SSTL_ASSERT(pos <= size());
+        char* buff = _insert_uninitialized(pos, count);
+        memset(buff, c, count);
+        return *this;
+    }
+
+    string& insert(size_type pos, const char* s)
+    {
+        size_type size = static_cast<size_type>(strlen(s));
+        return insert(pos, s, size);
+    }
+
+    string& insert(size_type pos, const char* s, size_type count)
+    {
+        SSTL_ASSERT(pos <= size());
+        char* buff = _insert_uninitialized(pos, count);
+        memcpy(buff, s, count);
+        return *this;
+    }
+
+    string& insert(size_type pos, const string& str)
+    {
+        return insert(pos, str.data(), str.size());
+    }
+
+    string& insert(size_type pos, const string& str, size_type strPos, size_type strCount)
+    {
+        SSTL_ASSERT(strPos + strCount < str.size());
+        return insert(pos, str.data() + strPos, strCount);
+    }
+
+    template
+    <class InputIt>
+    iterator insert(const_iterator where, InputIt inputFirst, InputIt inputLast)
+    {
+        SSTL_ASSERT(inputFirst <= inputLast);
+        SSTL_ASSERT(where >= _bytes && where <= _bytes + size());
+        size_type pos = where - _bytes;
+        size_type count = inputLast - inputFirst;
+        char* buff = _insert_uninitialized(pos, count);
+        for ( ; inputFirst != inputLast; ++inputFirst, ++buff )
+            buff = *inputFirst;
+        return buff;
+    }
+
+    string& replace(size_type pos, size_type count, const string& str)
+    {
+        char* buff = _replace_uninitialized(pos, count, str.size());
+        memcpy(buff, str.data(), str.size());
+        return *this;
+    }
+
+    string& replace(const_iterator first, const_iterator last, const string& str)
+    {
+        SSTL_ASSERT(first >= _bytes);
+        SSTL_ASSERT(last <= _bytes + size());
+        size_type pos = static_cast<unsigned>(first - _bytes);
+        size_type count = static_cast<unsigned>(last - first);
+        return replace(pos, count, str);
+    }
+
+    string& replace(size_type pos, size_type count, const string& str, size_type strPos, size_type strCount)
+    {
+        SSTL_ASSERT(strPos <= str.size());
+        SSTL_ASSERT(strPos + strCount <= str.size());
+        return replace(pos, count, str.data() + strPos, strCount);
+    }
+
+    template
+    <class InputIt>
+    string& replace(const_iterator first, const_iterator last, InputIt inputFirst, InputIt inputLast)
+    {
+        SSTL_ASSERT(first >= _bytes);
+        SSTL_ASSERT(last <= _bytes + size());
+        SSTL_ASSERT(inputFirst <= inputLast);
+        size_type pos = first - _bytes;
+        size_type count = last - first;
+        size_type newCount = inputLast - inputFirst;
+        char* buff = _replace_uninitialized(pos, count, newCount);
+        for ( ; inputFirst != inputLast; ++inputFirst, ++buff )
+            *buff = *inputFirst;
+        return *this;
+    }
+
+    string& replace(size_type pos, size_type count, const char* s, size_type sCount)
+    {
+        char* buff = _replace_uninitialized(pos, count, sCount);
+        memcpy(buff, s, sCount);
+        return *this;
+    }
+
+    string& replace(const_iterator first, const_iterator last, const char* s, size_type strCount)
+    {
+        SSTL_ASSERT(first >= _bytes);
+        SSTL_ASSERT(last <= _bytes + size());
+        SSTL_ASSERT(first <= last);
+        size_type pos = static_cast<unsigned>(first - _bytes);
+        size_type count = static_cast<unsigned>(last - first);
+        return replace(pos, count, s, strCount);
+    }
+
+    string& replace(size_type pos, size_type count, const char* s)
+    {
+        size_type sCount = static_cast<size_type>(strlen(s));
+        return replace(pos, count, s, sCount);
+    }
+
+    string& replace(const_iterator first, const_iterator last, const char* s)
+    {
+        SSTL_ASSERT(first >= _bytes);
+        SSTL_ASSERT(last <= _bytes + size());
+        SSTL_ASSERT(first <= last);
+        size_type pos = static_cast<size_type>(first - _bytes);
+        size_type count = static_cast<size_type>(last - first);
+        return replace(pos, count, s);
+    }
+
+    string& replace(size_type pos, size_type count, size_type cCount, char c)
+    {
+        char* buff = _replace_uninitialized(pos, count, cCount);
+        char* buffEnd = buff + cCount;
+        for ( ; buff != buffEnd; ++buff )
+            *buff = c;
+        return *this;
+    }
+
+    string& replace(const_iterator first, const_iterator last, size_type cCount, char c)
+    {
+        SSTL_ASSERT(first >= _bytes);
+        SSTL_ASSERT(last <= _bytes + size());
+        SSTL_ASSERT(first <= last);
+        size_type pos = static_cast<size_type>(first - _bytes);
+        size_type count = static_cast<size_type>(last - first);
+        return replace(pos, count, cCount, c);
+    }
+
+    int compare(const string& str) const;
+    int compare(const char* str) const;
+    int compare(const char* str, size_type size) const;
+
+    ///@{
+    /// Equality test that takes two const strings.
+    ///
+    bool operator==(const string& s) const;
+    bool operator==(const char* s) const;
+    friend bool operator==(const char* s1, const string& s2)
+    {
+        return s2.operator==(s1);
+    }
+    bool operator!=(const string& s) const
+    {
+        return !operator==(s);
+    }
+    friend bool operator!=(const char* s1, const string& s2)
+    {
+        return !s2.operator==(s1);
+    }
+    ///@}
+
+    ///@{
+    // Inequality operator with obvious semantics.
+    //
+    bool operator<(const string& s) const
+    {
+        return compare(s) < 0;
+    }
+    bool operator<(const char* s) const
+    {
+        return compare(s) < 0;
+    }
+    friend bool operator<(const char* s1, const string& s2)
+    {
+        return s2.compare(s1) >= 0;
+    }
+
+    bool operator<=(const string& s) const
+    {
+        return compare(s) <= 0;
+    }
+    bool operator<=(const char* s) const
+    {
+        return compare(s) <= 0;
+    }
+    friend bool operator<=(const char* s1, const string& s2)
+    {
+        return s2.compare(s1) > 0;
+    }
+
+    bool operator>(const string& s) const
+    {
+        return compare(s) > 0;
+    }
+    bool operator>(const char* s) const
+    {
+        return compare(s) > 0;
+    }
+    friend bool operator>(const char* s1, const string& s2)
+    {
+        return s2.compare(s1) <= 0;
+    }
+
+    bool operator>=(const string& s) const
+    {
+        return compare(s) >= 0;
+    }
+    bool operator>=(const char* s) const
+    {
+        return compare(s) >= 0;
+    }
+    friend bool operator>=(const char* s1, const string& s2)
+    {
+        return s2.compare(s1) < 0;
+    }
+    ///@}
+
+    /// Nonconstant indexing operator only assumes immediate assignmnet, no reference shall be stored to assign later
+    ///
+    char& operator[](size_type i)
+    {
+        SSTL_ASSERT(i < size());
+        _make_unique();
+        return _bytes[i];
+    }
+    char operator[](size_type i) const
+    {
+        SSTL_ASSERT(i < size());
+        return _bytes[i];
+    }
+
+    void swap(string& other)
+    {
+        char* bytes = _bytes; // works if other is this
+        _bytes = other._bytes;
+        other._bytes = bytes;
+    }
+
+    bool is_shared() const
+    {
+        return _get_buffer()->_ref_count > 0;
+    }
+
+    bool is_interned() const
+    {
+        return _get_buffer()->_hash != 0;
+    }
+
+    void intern();
+    static string intern_create(const char* s);
+    static string intern_create(const char* s, size_type size);
+    static void intern_cleanup(time_t secondsSincePrevious = 60);
+
+private: // Methods:
+
+    _buffer_type* _get_buffer()
+    {
+        return reinterpret_cast<_buffer_type*>(_bytes - _buffer_type_header_sizeof); // offset from header
+    }
+    const _buffer_type* _get_buffer() const
+    {
+        return reinterpret_cast<const _buffer_type*>(_bytes - _buffer_type_header_sizeof); // offset from header
+    }
+
+    void DoSet(char c)
+    {
+        _bytes = _new_uninitialized(1);
+        _bytes[0] = c;
+    }
+
+    void DoSet(const char* str)
+    {
+        const size_type len = static_cast<size_type>(strlen(str));
+        DoSet(str, len);
+    }
+
+    void DoSet(const char* str, size_type size)
+    {
+        _bytes = _new_uninitialized(size);
+        memcpy(_bytes, str, size);
+    }
+
+    void DoSet(size_type size, char c)
+    {
+        _bytes = _new_uninitialized(size);
+        memset(_bytes, c, size);
+    }
+
+    template
+    <class Iterator>
+    void DoSet(Iterator begin, Iterator end)
+    {
+        SSTL_ASSERT(end >= begin);
+        unsigned size = static_cast<unsigned>(end - begin);
+        DoSet(static_cast<const char*>(&*begin), size);
+    }
+
+    void DoSet(const string& other)
+    {
+        SSTL_ASSERT(&other != this);
+        other._get_buffer()->_ref_increment();
+        _bytes = other._bytes;
+    }
+
+    char* _make_unique();
+
+    char* _insert_uninitialized(size_type index, size_type count);
+
+    char* _append_uninitialized(size_type count);
+
+    char* _replace_uninitialized(size_type index, size_type count, size_type new_count);
+
+    static _buffer_type* DoNewUninitializedBuffer(size_type size);
+
+    static char* _new_uninitialized(size_type size)
+    {
+        return DoNewUninitializedBuffer(size)->_bytes;
+    }
+
+public: // Data:
+
+    /// Static empty string that is suitable for context where empty string is necessary.
+    ///
+    static string _empty_string;
+
+private: // Data:
+
+    // Pointer to bytes field of private Buffer class in the string.
+    //
+    mutable char* _bytes;
+
+    // Private static member that holds the buffer with string "".
+    // The AConstString object default constructor makes the object
+    // point to this buffer.
+    //
+    static _buffer_type _empty_string_buffer;
+};
+
+}
+
+#endif

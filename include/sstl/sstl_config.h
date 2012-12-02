@@ -1,0 +1,8 @@
+#ifndef _SSTL__SSTL_CONFIG_INCLUDED
+#define _SSTL__SSTL_CONFIG_INCLUDED
+
+#if !defined(SSTL_CONFIG_MULTITHREADED)
+    #define SSTL_CONFIG_MULTITHREADED 1
+#endif
+
+#endif

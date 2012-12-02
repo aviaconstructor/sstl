@@ -1,0 +1,196 @@
+#ifndef _SSTL__MUTEX
+#define _SSTL__MUTEX
+
+#include "sstl_common.h"
+
+namespace SSTL_NAMESPACE {
+
+#if defined(_WIN32)  // Generic Windows, both 32 and 64
+
+class mutex
+{
+    void _verify_not_destroyed()
+    {
+        SSTL_ASSERT(((const char*)&_native_handle)[0] != '\xFF' || ((const char*)&_native_handle)[1] != '\xFF');
+    }
+
+public:
+
+    typedef CRITICAL_SECTION native_handle_type;
+
+    native_handle_type& native_handle() {return &_native_handle;}
+    const native_handle_type& native_handle() const {return &_native_handle;}
+
+    mutex()
+    {
+        ::InitializeCriticalSection(&_native_handle);
+    }
+
+    ~_mutex_base()
+    {
+        _verify_not_destroyed();
+        ::DeleteCriticalSection(&_native_handle);
+        #if SSTL_DEBUG
+            memset((void*)&_native_handle, 0xFF, sizeof(_native_handle)); // trigger _verify_not_destroyed
+        #endif
+    }
+
+    void lock()
+    {
+        _verify_not_destroyed();
+        ::EnterCriticalSection(&_native_handle);
+    }
+
+    bool try_lock()
+    {
+        _verify_not_destroyed();
+        return ::TryEnterCriticalSection(&_native_handle) != FALSE;
+    }
+
+    void unlock()
+    {
+        _verify_not_destroyed();
+        ::LeaveCriticalSection(&_native_handle);
+    }
+
+private:
+
+    // Delete these
+    mutex(const mutex&);
+    mutex& operator=(const mutex&);
+};
+
+class recursive_mutex : public mutex
+{
+public:
+    recursive_mutex() : mutex() {}
+    ~recursive_mutex() {}
+
+    void lock()     {mutex::lock();}
+    bool try_lock() {return mutex::try_lock();}
+    void unlock()   {mutex::unlock();}
+};
+
+#else // POSIX systems based on pthread
+
+#include <pthread.h>
+
+class _mutex_base
+{
+public:
+
+    typedef pthread_mutex_t native_handle_type;
+
+    native_handle_type native_handle() const {return _native_handle;}
+
+    void lock()
+    {
+        int result = pthread_mutex_lock(&_native_handle);
+        SSTL_ASSERT(result == 0);
+        SSTL_USE(result);
+    }
+
+    bool try_lock()
+    {
+        return pthread_mutex_trylock(&_native_handle) == 0;
+    }
+
+    void unlock()
+    {
+        int result = pthread_mutex_unlock(&_native_handle);
+        SSTL_ASSERT(result == 0);
+        SSTL_USE(result);
+    }
+
+protected:
+
+    _mutex_base()
+    {
+        // do nothing
+    }
+
+    ~_mutex_base()
+    {
+        int result = pthread_mutex_destroy(&_native_handle);
+        SSTL_ASSERT(result == 0);
+        SSTL_USE(result);
+    }
+
+    native_handle_type _native_handle;
+
+private:
+
+    // Delete from this and parents
+    _mutex_base(const _mutex_base&);
+    _mutex_base& operator=(const _mutex_base&);
+};
+
+
+class mutex : public _mutex_base
+{
+public:
+
+    mutex()
+    {
+        int result = pthread_mutex_init(&_native_handle, NULL);
+        SSTL_ASSERT(result == 0);
+        SSTL_USE(result);
+    }
+};
+
+class recursive_mutex : public _mutex_base
+{
+public:
+
+    recursive_mutex()
+    {
+        pthread_mutexattr_t attr;
+        int result = pthread_mutexattr_init(&attr);
+        SSTL_ASSERT(result == 0);
+        result = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+        SSTL_ASSERT(result == 0);
+        result = pthread_mutex_init(&_native_handle, &attr);
+        SSTL_ASSERT(result == 0);
+        result = pthread_mutexattr_destroy(&attr);
+        SSTL_ASSERT(result == 0);
+        SSTL_USE(result);
+    }
+};
+
+#endif
+
+/// Constructor tag type
+/// The definition is made to compile by all tested C++ compilers.
+/// As enumeration is used instead of struct, this is incompatible by the standard, but the usage is the same.
+enum adopt_lock_t {adopt_lock};
+
+template<class Mutex>
+class lock_guard
+{
+public:
+
+    typedef Mutex mutex_type;
+
+public:
+
+    explicit lock_guard(mutex_type& mutex)
+        : _mutex(mutex)
+    {_mutex.lock();}
+
+    lock_guard(mutex_type& mutex, adopt_lock_t)
+        : _mutex(mutex)
+    {}
+
+    ~lock_guard() {_mutex.unlock();}
+
+private:
+    lock_guard(const lock_guard&);
+    lock_guard& operator=(const lock_guard&);
+
+private:
+    mutex_type& _mutex;
+};
+
+} // namespace
+
+#endif

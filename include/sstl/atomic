@@ -1,0 +1,102 @@
+#ifndef _SSTL__ATOMIC_INCLUDED
+#define _SSTL__ATOMIC_INCLUDED
+
+#include "sstl_common.h"
+
+#if defined(__QNXNTO__) // QNX
+   #include <atomic.h>
+#endif
+
+namespace SSTL_NAMESPACE {
+
+struct atomic_int
+{
+    volatile int _value;
+
+public:
+
+    atomic_int(int initial_value = 0)
+        : _value(initial_value)
+    {}
+
+    bool is_lock_free() const volatile {return true;}
+    bool is_lock_free() const          {return true;}
+
+    void store(int v) volatile {static_store(&_value, v);}
+    void store(int v)          {static_store(&_value, v);}
+
+    int load() const volatile {return static_load(&_value);}
+    int load() const          {return static_load(&_value);}
+
+    operator int() const volatile {return static_load(&_value);}
+    operator int() const          {return static_load(&_value);}
+
+    int operator++() volatile {return static_fetch_and_increment(&_value) + 1;}
+    int operator++()          {return static_fetch_and_increment(&_value) + 1;}
+
+    int operator++(int) volatile {return static_fetch_and_increment(&_value);}
+    int operator++(int)          {return static_fetch_and_increment(&_value);}
+
+    int operator--() volatile {return static_fetch_and_decrement(&_value) - 1;}
+    int operator--()          {return static_fetch_and_decrement(&_value) - 1;}
+
+    int operator--(int) volatile {return static_fetch_and_decrement(&_value);}
+    int operator--(int)          {return static_fetch_and_decrement(&_value);}
+
+    static void static_store(volatile int* placement, int value)
+    {
+        *placement = value; // all supported architectures guarantee this
+    }
+
+    static int static_load(const volatile int* placement)
+    {
+        return *const_cast<const int*>(placement); // all supported architectures guarantee this
+    }
+
+    static int static_fetch_and_increment(volatile int* placement)
+    {
+        int result;
+        #if !SSTL_CONFIG_MULTITHREADED
+            result = *placement;
+            ++ *placement;
+        #elif defined(_WIN32_WCE) // Windows CE has an incompatible definition
+            result = static_cast<int>(::InterlockedIncrement(const_cast<LONG*>(reinterpret_cast<volatile LONG*>(placement)))) - 1;
+        #elif defined(_WIN32)  // Generic Windows, both 32 and 64
+            result = static_cast<int>(::InterlockedIncrement(reinterpret_cast<volatile LONG*>(placement))) - 1;
+        #elif defined(__QNXNTO__) // QNX
+            result = static_cast<int>(::atomic_add_value(reinterpret_cast<volatile unsigned*>(placement), 1));
+        #else // Otherwise assume GCC or compatibles
+            result = __sync_fetch_and_add(placement, 1);
+        #endif
+        return result;
+    }
+
+    static int static_fetch_and_decrement(volatile int* placement)
+    {
+        int result;
+        #if !SSTL_CONFIG_MULTITHREADED
+            result = *placement;
+            ++ *placement;
+        #elif defined(_WIN32_WCE) // Windows CE has an incompatible definition
+            result = static_cast<int>(::InterlockedDecrement(const_cast<LONG*>(reinterpret_cast<volatile LONG*>(placement)))) + 1;
+        #elif defined(_WIN32)  // Generic Windows, both 32 and 64
+            result = static_cast<int>(::InterlockedDecrement(reinterpret_cast<volatile LONG*>(placement))) + 1;
+        #elif defined(__QNXNTO__) // QNX
+            result = static_cast<int>(::atomic_sub_value(reinterpret_cast<volatile unsigned*>(placement), 1));
+        #else // Otherwise assume GCC or compatibles
+            result = __sync_fetch_and_sub(placement, 1);
+        #endif
+        return result;
+    }
+
+private:
+
+    atomic_int(const atomic_int&);
+    atomic_int& operator=(const atomic_int&);
+    atomic_int& operator=(const atomic_int&) volatile;
+
+};
+
+} // namespace
+
+#endif

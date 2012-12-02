@@ -1,0 +1,84 @@
+#ifndef _SSTL__ITERATOR_INCLUDED
+#define _SSTL__ITERATOR_INCLUDED
+
+#include "sstl_common.h"
+
+namespace SSTL_NAMESPACE {
+
+template
+   <typename T>
+struct iterator_traits
+{
+    typedef typename T::value_type      value_type;
+    typedef typename T::difference_type difference_type;
+    typedef typename T::pointer         pointer;
+    typedef typename T::reference       reference;
+};
+
+template
+   <typename T>
+struct iterator_traits<T*>
+{
+    typedef T         value_type;
+    typedef ptrdiff_t difference_type;
+    typedef const T*  const_pointer;
+    typedef T*        pointer;
+    typedef const T&  const_reference;
+    typedef T&        reference;
+};
+
+template
+   <typename T>
+struct iterator_traits<const T*>
+{
+    typedef T          value_type;
+    typedef ptrdiff_t  difference_type;
+    typedef const T*   const_pointer;
+    typedef const T*   pointer;
+    typedef const T&   const_reference;
+    typedef const T&   reference;
+};
+
+template
+   <typename T>
+class reverse_iterator
+{
+    T _iterator;
+
+public:
+
+    typedef typename iterator_traits<T>::value_type       value_type;
+    typedef typename iterator_traits<T>::difference_type  difference_type;
+    typedef typename iterator_traits<T>::pointer          pointer;
+    typedef typename iterator_traits<T>::reference        reference;
+
+public:
+
+    reverse_iterator()
+        : _iterator()
+    {}
+
+    explicit reverse_iterator (T iterator)
+        : _iterator(iterator)
+    {}
+
+    bool operator==(const reverse_iterator& p) const { return _iterator == p._iterator; }
+    bool operator<(const reverse_iterator& p) const { return p._iterator < _iterator; }
+    T base () const { return (_iterator); }
+    reference                operator* () const { T prev(_iterator); --prev; return *prev; }
+    pointer                  operator-> () const { return &(operator*()); }
+    reverse_iterator&        operator++ () { -- _iterator; return *this; }
+    reverse_iterator&        operator-- () { ++ _iterator; return *this; }
+    reverse_iterator         operator++ (int) { reverse_iterator<T> prev(*this); --_iterator; return prev; }
+    reverse_iterator         operator-- (int) { reverse_iterator<T> prev(*this); ++_iterator; return prev; }
+    reverse_iterator&        operator+= (size_t n) { _iterator -= n; return *this; }
+    reverse_iterator&        operator-= (size_t n) { _iterator += n; return *this; }
+    reverse_iterator         operator+ (size_t n) const { return reverse_iterator<T>(_iterator - n); }
+    reverse_iterator         operator- (size_t n) const { return reverse_iterator<T>(_iterator + n); }
+    reference                operator[] (int n) const { return *(*this + n); }
+    difference_type operator- (const reverse_iterator& i) const { return distance(_iterator, i._iterator); }
+};
+
+} // namespace
+
+#endif
