@@ -33,7 +33,6 @@ size_t test(const char* name, size_t size, ptrdiff_t& prev_diff, size_t& prev_si
         }
         deallocate(a[i]);
     }
-    //printf("%d ", diff);
     if (prev_diff == 0)
     {
         prev_diff = diff;

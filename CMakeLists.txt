@@ -11,14 +11,10 @@ endif()
 
 option(SSTL_SHARED_LIBRARY "Create shared library (so or dll), otherwise statically linked" OFF)
 
-
 set(PACKAGE_NAME ${CMAKE_PROJECT_NAME})
 set(PACKAGE_VERSION 0.1)
 set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
 
-add_definitions(-DSSTL_IS_BEING_BUILT)
-
-include_directories(include/sstl)
+include_directories(include)
 add_subdirectory(lib/sstl)
-add_subdirectory(test/compiler)
-#add_subdirectory(test/sstl)
+add_subdirectory(test)

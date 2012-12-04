@@ -35,6 +35,8 @@
 
 #define SSTL_USE(variable)  (variable)
 
+#define SSTL_CONSTEXPR
+
 #if defined(_WIN32)
     typedef __int64            sstl_int64;
     typedef unsigned __int64   sstl_uint64;

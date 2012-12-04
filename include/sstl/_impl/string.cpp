@@ -14,28 +14,24 @@ inline unsigned _adjust_capacity(unsigned size)
     return result;
 }
 
-void string::reserve(size_type reserved_size) const
+void string::reserve(size_type reserved_size)
 {
     if (reserved_size > capacity())
-    {
-        reserved_size = _adjust_capacity(reserved_size);
-        size_t buffer_sizeof = string::_buffer_type_header_sizeof + reserved_size;
-        _buffer_type* buff = reinterpret_cast<_buffer_type*>(new char[buffer_sizeof]);
-        buff->_hash = 0;
-        buff->_capacity = reserved_size;
-        buff->_ref_count = 0;
-        buff->_size = _get_buffer()->_size;
-        memcpy(buff->_bytes, _bytes, buff->_size);
-        _get_buffer()->_ref_decrement();
-        _bytes = buff->_bytes;
-    }
+        _reallocate(reserved_size);
+}
+
+void string::shrink_to_fit()
+{
+    const size_type new_capacity = _adjust_capacity(size());
+    if (new_capacity < capacity())
+        _reallocate(new_capacity);
 }
 
 const char* string::c_str() const
 {
     const size_type s = size();
     if (capacity() == s) // have to reallocate
-        reserve(s + 1);
+        _reallocate(s + 1);
     _bytes[s] = '\0'; // if capacity allows, it is safe to do even if there are many references
     return _bytes;
 }
@@ -91,7 +87,7 @@ void string::resize(size_type new_size)
     {
         if (new_size < old_size) // shrink
         {
-            _make_unique();
+            unshare();
             _get_buffer()->_size = new_size;
         }
         else // grow
@@ -108,7 +104,7 @@ string& string::erase(size_type pos, size_type count)
     SSTL_ASSERT(pos + count <= size());
     if (count != 0)
     {
-        _make_unique();
+        unshare();
         const size_type end_pos = pos + count;
         memmove(_bytes + pos, _bytes + end_pos, size() - end_pos);
         _get_buffer()->_size -= count;
@@ -170,9 +166,21 @@ bool string::operator==(const char* s) const
     return memcmp(_bytes, s, len) == 0;
 }
 
-string::_buffer_type* string::DoNewUninitializedBuffer(size_type size)
+void string::_reallocate(size_type new_capacity) const
 {
-    unsigned capacity = _adjust_capacity(size);
+    SSTL_ASSERT(size() <= new_capacity);
+
+    new_capacity = _adjust_capacity(new_capacity);
+    _buffer_type* buff = _new_uninitialized_buffer(size(), new_capacity);
+    memcpy(buff->_bytes, _bytes, buff->_size);
+    _get_buffer()->_ref_decrement();
+    _bytes = buff->_bytes;
+}
+
+string::_buffer_type* string::_new_uninitialized_buffer(size_type size, size_type capacity)
+{
+    SSTL_ASSERT(size <= capacity);
+    SSTL_ASSERT(capacity >= _minimum_capacity);
     unsigned buffer_sizeof = _buffer_type_header_sizeof + capacity;
     _buffer_type* buff = reinterpret_cast<_buffer_type*>(new char[buffer_sizeof]);
     buff->_hash = 0;
@@ -182,7 +190,12 @@ string::_buffer_type* string::DoNewUninitializedBuffer(size_type size)
     return buff;
 }
 
-char* string::_make_unique()
+char* string::_new_uninitialized(size_type size)
+{
+    return _new_uninitialized_buffer(size, _adjust_capacity(size))->_bytes;
+}
+
+void string::unshare()
 {
     _buffer_type* buff = _get_buffer();
     if (buff->_ref_count > 0)
@@ -191,13 +204,11 @@ char* string::_make_unique()
         memcpy(bytes, _bytes, buff->_size);
         _get_buffer()->_ref_decrement();
         _bytes = bytes;
-        return bytes;
     }
     else
     {
         SSTL_ASSERT(!is_interned()); // attempt to modify a non-referenced interned string is made somehow
     }
-    return NULL;
 }
 
 char* string::_append_uninitialized(size_type count)
@@ -206,7 +217,7 @@ char* string::_append_uninitialized(size_type count)
     size_type old_size = size();
     size_type new_size = old_size + count;
     if (new_size < capacity()) // +1 for terminating zero
-        _make_unique();
+        unshare();
     else // grow
     {
         char* bytes = _new_uninitialized(new_size);
@@ -230,7 +241,7 @@ char* string::_insert_uninitialized(size_type index, size_type count)
     size_type new_size = old_size + count;
     if (new_size < capacity()) // +1 for terminating zero
     {
-        _make_unique();
+        unshare();
         memmove(_bytes + index + count, _bytes + index, old_size - index);
     }
     else // grow
@@ -294,7 +305,7 @@ public:
         delete [] _buffers;
     }
 
-    void Add(string& str)
+    void add(string& str)
     {
         string::_buffer_type* buff = str._get_buffer();
         if (buff->_size == 0)
@@ -311,7 +322,7 @@ public:
         buff->_hash = string::static_hash(buff->_bytes, buff->_size);
 
         lock_guard<mutex> lock(_lock);
-        string::_buffer_type** cell = FindCellForAddition(buff->_hash, buff->_bytes, buff->_size);
+        string::_buffer_type** cell = find_cell_for_addition(buff->_hash, buff->_bytes, buff->_size);
         if (*cell != NULL)
         {
             buff->_ref_decrement();
@@ -322,7 +333,7 @@ public:
         (*cell)->_ref_increment();
     }
 
-    string::_buffer_type* Add(const char* str, unsigned size)
+    string::_buffer_type* add(const char* str, unsigned size)
     {
         if (size == 0)
         {
@@ -333,10 +344,10 @@ public:
         unsigned hash = string::static_hash(str, size);
 
         lock_guard<mutex> lock(_lock);
-        string::_buffer_type** cell = FindCellForAddition(hash, str, size);
+        string::_buffer_type** cell = find_cell_for_addition(hash, str, size);
         if (*cell == NULL)
         {
-            string::_buffer_type* buff = string::DoNewUninitializedBuffer(size);
+            string::_buffer_type* buff = string::_new_uninitialized_buffer(size, _adjust_capacity(size));
             memcpy(buff->_bytes, str, size);
             buff->_hash = hash;
             *cell = buff;
@@ -351,21 +362,21 @@ public:
         if (_count != 0)
         {
             lock_guard<mutex> lock(_lock);
-            Resize(_capacity);
+            resize(_capacity);
         }
     }
 
-    void Resize(int newCapacity);
+    void resize(int new_capacity);
 
-    string::_buffer_type** FindCellForAddition(unsigned hash, const char* bytes, unsigned size);
+    string::_buffer_type** find_cell_for_addition(unsigned hash, const char* bytes, unsigned size);
 
-    static _intern_holder* GetGlobal()
+    static _intern_holder* get_global()
     {
         static _intern_holder holder;
         return &holder;
     }
 
-private: // Attributes:
+private:
 
     int _capacity; // has to be power of two
     int _count;
@@ -373,10 +384,10 @@ private: // Attributes:
     sstl::mutex _lock;
 };
 
-string::_buffer_type** _intern_holder::FindCellForAddition(unsigned hash, const char* bytes, unsigned size)
+string::_buffer_type** _intern_holder::find_cell_for_addition(unsigned hash, const char* bytes, unsigned size)
 {
     if (_capacity <= (_count << 1))
-        Resize(_capacity == 0 ? hashtable_default_size : _capacity + _capacity);
+        resize(_capacity == 0 ? hashtable_default_size : _capacity + _capacity);
 
     int index = static_cast<int>(hash & (_capacity - 1u)); // normalize hash into index
     string::_buffer_type** bb;
@@ -399,26 +410,26 @@ string::_buffer_type** _intern_holder::FindCellForAddition(unsigned hash, const 
     }
 }
 
-void _intern_holder::Resize(int newCapacity)
+void _intern_holder::resize(int new_capacity)
 {
-    SSTL_ASSERT(newCapacity >= _capacity);
-    SSTL_ASSERT((newCapacity & (newCapacity - 1)) == 0); // newCapacity is the power of two
+    SSTL_ASSERT(new_capacity >= _capacity);
+    SSTL_ASSERT((new_capacity & (new_capacity - 1)) == 0); // newCapacity is the power of two
 
-    string::_buffer_type** newBuffers = new string::_buffer_type*[newCapacity];
+    string::_buffer_type** new_buffers = new string::_buffer_type*[new_capacity];
 
-    string::_buffer_type** it = newBuffers;
-    string::_buffer_type** itEnd = newBuffers + newCapacity;
-    for (; it != itEnd; ++it)
-        *it = NULL;
+    string::_buffer_type** i = new_buffers;
+    string::_buffer_type** i_end = new_buffers + new_capacity;
+    for (; i != i_end; ++i)
+        *i = NULL;
 
     if (_count != 0)
     {
-        int newCount = 0;
-        it = _buffers;
-        itEnd = _buffers + _capacity;
-        for (; it != itEnd; ++it)
+        int new_count = 0;
+        i = _buffers;
+        i_end = _buffers + _capacity;
+        for (; i != i_end; ++i)
         {
-            string::_buffer_type* buff = *it;
+            string::_buffer_type* buff = *i;
             if (buff != NULL)
             {
                 SSTL_ASSERT(buff->_hash != 0);
@@ -437,7 +448,7 @@ void _intern_holder::Resize(int newCapacity)
                         if (b == NULL)
                         {
                             *bb = buff; // relocate
-                            ++newCount;
+                            ++new_count;
                             break;
                         }
 
@@ -449,28 +460,28 @@ void _intern_holder::Resize(int newCapacity)
                 }
             }
         }
-        SSTL_ASSERT(_count >= newCount);
-        _count = newCount;
+        SSTL_ASSERT(_count >= new_count);
+        _count = new_count;
     }
     delete _buffers;
-    _buffers = newBuffers;
-    _capacity = newCapacity;
+    _buffers = new_buffers;
+    _capacity = new_capacity;
 }
 
 void string::intern()
 {
     if (!is_interned())
-        _intern_holder::GetGlobal()->Add(*this);
+        _intern_holder::get_global()->add(*this);
 }
 
 string string::intern_create(const char* s)
 {
-    return _intern_holder::GetGlobal()->Add(s, strlen(s));
+    return _intern_holder::get_global()->add(s, strlen(s));
 }
 
 string string::intern_create(const char* s, size_type size)
 {
-    return _intern_holder::GetGlobal()->Add(s, size);
+    return _intern_holder::get_global()->add(s, size);
 }
 
 void string::intern_cleanup(time_t secondsSincePrevious)
@@ -483,7 +494,7 @@ void string::intern_cleanup(time_t secondsSincePrevious)
             return;
         s_lastTime = now;
     }
-    _intern_holder::GetGlobal()->OptimizeAndGarbageCollect();
+    _intern_holder::get_global()->OptimizeAndGarbageCollect();
 }
 
 }

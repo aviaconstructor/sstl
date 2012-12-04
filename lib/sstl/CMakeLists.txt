@@ -9,6 +9,8 @@ else()
     add_library(cxx STATIC ${LIBSSTL_SOURCE_FILES})
 endif()
 
+add_definitions(-DSSTL_IS_BEING_BUILT)
+
 install(TARGETS cxx
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
