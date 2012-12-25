@@ -15,6 +15,8 @@ set(PACKAGE_NAME ${CMAKE_PROJECT_NAME})
 set(PACKAGE_VERSION 0.1)
 set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
 
+enable_testing()
+
 include_directories(include)
 add_subdirectory(lib/sstl)
 add_subdirectory(test)

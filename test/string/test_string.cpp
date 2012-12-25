@@ -1,4 +1,4 @@
-#include <cassert>
+#include <gtest/gtest.h>
 
 #if defined(TEST_NATIVE_STL)
     #include <string>
@@ -15,16 +15,16 @@
 
 static void _check_string_indexing(string& s, string::size_type size)
 {
-    assert(s.size() == size);
+    ASSERT_EQ(s.size(), size);
     for (int i = 0; i < size; ++i)
     {
         char c = (i & 0x7) + '0';  // by convention
-        assert(s.at(i) == c);
-        assert(s[i] == c);
+        ASSERT_EQ(s.at(i), c);
+        ASSERT_EQ(s[i], c);
     }
 }
 
-void test_string_indexing()
+TEST(test_string, indexing)
 {
     string s = "01234567";
     _check_string_indexing(s, 8);
@@ -40,39 +40,39 @@ void test_string_indexing()
 
 static void _check_string_iterators(string s, string::size_type size, char front, char back)
 {
-    assert(s.size() == size);
+    ASSERT_EQ(s.size(), size);
 
-    assert(&(*s.begin()) == &s[0]);
-    assert(*s.begin() == front);
+    ASSERT_EQ(&(*s.begin()), &s[0]);
+    ASSERT_EQ(*s.begin(), front);
 
-    assert(&(*s.end()) == &s[0] + size);
+    ASSERT_EQ(&(*s.end()), &s[0] + size);
 
-    assert(&(*s.rbegin()) == &s[size - 1]);
-    assert(*s.rbegin() == back);
+    ASSERT_EQ(&(*s.rbegin()), &s[size - 1]);
+    ASSERT_EQ(*s.rbegin(), back);
 
-    assert(&(*s.rend()) == &s[0] - 1);
+    ASSERT_EQ(&(*s.rend()), &s[0] - 1);
 
 #if !defined(TEST_NATIVE_STL) || __cplusplus >= 201100
-    assert(&(*s.cbegin()) == &s[0]);
-    assert(*s.cbegin() == front);
+    ASSERT_EQ(&(*s.cbegin()), &s[0]);
+    ASSERT_EQ(*s.cbegin(), front);
 
-    assert(&(*s.cend()) == &s[0] + size);
+    ASSERT_EQ(&(*s.cend()), &s[0] + size);
 
-    assert(&(*s.crbegin()) == &s[size - 1]);
-    assert(*s.crbegin() == back);
+    ASSERT_EQ(&(*s.crbegin()), &s[size - 1]);
+    ASSERT_EQ(*s.crbegin(), back);
 
-    assert(&(*s.crend()) == &s[0] - 1);
+    ASSERT_EQ(&(*s.crend()), &s[0] - 1);
 
-    assert(s.front() == front);
-    assert(s.front() == s[0]);
-    assert(&s.front() == s.begin());
+    ASSERT_EQ(s.front(), front);
+    ASSERT_EQ(s.front(), s[0]);
+    ASSERT_EQ(&s.front(), s.begin());
 
-    assert(s.back() == back);
-    assert(s.back() == s[size - 1]);
+    ASSERT_EQ(s.back(), back);
+    ASSERT_EQ(s.back(), s[size - 1]);
 #endif
 }
 
-void test_string_iterators()
+TEST(test_string, iterators)
 {
     _check_string_iterators(string("1"), 1, '1', '1');
     _check_string_iterators(string("12"), 2, '1', '2');
@@ -81,22 +81,21 @@ void test_string_iterators()
 
 static void _check_string_size(string s, string::size_type size)
 {
-    assert(s.empty() == (s.size() == 0));
-    assert(s.size() == size);
-    assert(s.length() == size);
-    assert(s.capacity() >= size);
+    ASSERT_EQ(s.empty(), (s.size() == 0));
+    ASSERT_EQ(s.size(), size);
+    ASSERT_EQ(s.length(), size);
+    ASSERT_GE(s.capacity(), size);
 
     // When the string completes its length to capacity, the capacity becomes equal to size
     string::difference_type diff = static_cast<string::difference_type>(s.capacity() - s.size());
     s.append(static_cast<string::size_type>(diff), ' ');
-    assert(s.capacity() == s.size());
+    ASSERT_EQ(s.capacity(), s.size());
 
     string::difference_type diff_from_maximum = static_cast<string::difference_type>(string::max_size() - s.size());
-    assert(diff_from_maximum >= 0);
-
+    ASSERT_GE(diff_from_maximum, 0);
 }
 
-void test_string_size()
+TEST(test_string, size)
 {
     _check_string_size(string(), 0);
     _check_string_size(string(""), 0);
@@ -104,12 +103,4 @@ void test_string_size()
 
     _check_string_size(string("12"), 2);
     _check_string_size(string("0123456789"), 10);
-}
-
-int main()
-{
-    test_string_indexing();
-    test_string_iterators();
-    test_string_size();
-    return 0;
 }

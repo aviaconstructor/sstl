@@ -2,6 +2,7 @@
 // of allocating small chunks of memory with malloc or new
 //
 
+#include <gtest/gtest.h>
 #include <stdio.h> // use libraries that should not allocate memory for IO
 #include <malloc.h>
 #include <algorithm>
@@ -58,7 +59,7 @@ static void deallocate_new(char* p)
     delete[] p;
 }
 
-int main()
+TEST(test_malloc_new, test)
 {
     ptrdiff_t prev_diff_malloc = 0;
     size_t prev_size_malloc = 0;
@@ -69,5 +70,4 @@ int main()
         test("malloc", size, prev_diff_malloc, prev_size_malloc, malloc, free);
         test("new   ", size, prev_diff_new, prev_size_new, allocate_new, deallocate_new);
     }
-    return 0;
 }
