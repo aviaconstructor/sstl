@@ -1,9 +1,6 @@
 #ifndef _SSTL__SSTL_COMMON_INCLUDED
 #define _SSTL__SSTL_COMMON_INCLUDED
 
-#include "sstl_version.h"
-#include "sstl_config.h"
-
 #include <memory.h>
 #include <malloc.h>
 #include <time.h>
@@ -14,6 +11,10 @@
 //#include <stdio.h>
 //#include <ctype.h>
 #include <limits.h>
+
+#include "sstl_version.h"
+#include "sstl_config.h"
+#include "sstl_types.h"
 
 #if defined(_WIN32)  // Generic Windows, both 32 and 64
     #include <winbase.h>
@@ -49,17 +50,5 @@
 /// This is a C++11 compatibility macro.
 ///
 #define SSTL_OVERRIDE
-
-///@{
-/// Compatible 64-bit type
-///
-#if defined(_WIN32)
-    typedef __int64            sstl_int64;
-    typedef unsigned __int64   sstl_uint64;
-#else
-    typedef long long          sstl_int64;
-    typedef unsigned long long sstl_uint64;
-#endif
-///@}
 
 #endif

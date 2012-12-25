@@ -62,21 +62,23 @@ public:
         : _iterator(iterator)
     {}
 
+    T base() const { return (_iterator); }
+
     bool operator==(const reverse_iterator& p) const { return _iterator == p._iterator; }
     bool operator<(const reverse_iterator& p) const { return p._iterator < _iterator; }
-    T base () const { return (_iterator); }
-    reference                operator* () const { T prev(_iterator); --prev; return *prev; }
-    pointer                  operator-> () const { return &(operator*()); }
-    reverse_iterator&        operator++ () { -- _iterator; return *this; }
-    reverse_iterator&        operator-- () { ++ _iterator; return *this; }
-    reverse_iterator         operator++ (int) { reverse_iterator<T> prev(*this); --_iterator; return prev; }
-    reverse_iterator         operator-- (int) { reverse_iterator<T> prev(*this); ++_iterator; return prev; }
-    reverse_iterator&        operator+= (size_t n) { _iterator -= n; return *this; }
-    reverse_iterator&        operator-= (size_t n) { _iterator += n; return *this; }
-    reverse_iterator         operator+ (size_t n) const { return reverse_iterator<T>(_iterator - n); }
-    reverse_iterator         operator- (size_t n) const { return reverse_iterator<T>(_iterator + n); }
-    reference                operator[] (int n) const { return *(*this + n); }
-    difference_type operator- (const reverse_iterator& i) const { return distance(_iterator, i._iterator); }
+
+    reference                operator*() const { T prev(_iterator); --prev; return *prev; }
+    pointer                  operator->() const { return &(operator*()); }
+    reverse_iterator&        operator++() { -- _iterator; return *this; }
+    reverse_iterator&        operator--() { ++ _iterator; return *this; }
+    reverse_iterator         operator++(int) { reverse_iterator<T> prev(*this); --_iterator; return prev; }
+    reverse_iterator         operator--(int) { reverse_iterator<T> prev(*this); ++_iterator; return prev; }
+    reverse_iterator&        operator+=(size_t n) { _iterator -= n; return *this; }
+    reverse_iterator&        operator-=(size_t n) { _iterator += n; return *this; }
+    reverse_iterator         operator+(size_t n) const { return reverse_iterator<T>(_iterator - n); }
+    reverse_iterator         operator-(size_t n) const { return reverse_iterator<T>(_iterator + n); }
+    reference                operator[](int n) const { return *(*this + n); }
+    difference_type          operator- (const reverse_iterator& i) const { return distance(_iterator, i._iterator); }
 };
 
 } // namespace
