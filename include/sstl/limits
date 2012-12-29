@@ -1,0 +1,235 @@
+#ifndef _SSTL__SSTL_LIMITS_INCLUDED
+#define _SSTL__SSTL_LIMITS_INCLUDED
+
+// Currently implemented only a subset of class members
+
+#include "sstl_common.h"
+#include "atomic"
+#include "iterator"
+
+#include <float.h>
+
+namespace SSTL_NAMESPACE {
+
+#if 0 // not implemented
+enum float_round_style
+{
+    round_indeterminate = -1,
+    round_toward_zero =  0,
+    round_to_nearest = 1,
+    round_toward_infinity = 2,
+    round_toward_neg_infinity = 3
+};
+
+enum float_denorm_style
+{
+    denorm_indeterminate = -1,
+    denorm_absent = 0,
+    denorm_present = 1
+};
+#endif
+
+template
+    <class T>
+class numeric_limits
+{
+protected:
+    typedef T type;
+
+#if 0 // not implemented
+    static const bool is_specialized = false;
+    static const bool is_signed = false;
+    static const bool is_integer = false;
+    static const bool is_exact = false;
+    static const bool has_infinity = false;
+    static const bool has_quiet_NaN = false;
+    static const bool has_signaling_NaN = false;
+    static const float_denorm_style has_denorm = denorm_absent;
+    static const bool has_denorm_loss = false;
+    static const float_round_style round_style = round_toward_zero;
+    static const bool is_iec559 = false;
+    static const bool is_bounded = false;
+    static const bool is_modulo = false;
+    static const int digits = 0;
+    static const int digits10 = 0;
+    static const int max_digits10 = 0;
+    static const int radix = 0;
+    static const int min_exponent = 0;
+    static const int min_exponent10 = 0;
+    static const int max_exponent = 0;
+    static const int max_exponent10 = 0;
+#endif
+
+    static SSTL_CONSTEXPR type min() {return type();}
+    static SSTL_CONSTEXPR type lowest() {return type();}
+    static SSTL_CONSTEXPR type max() {return type();}
+    static SSTL_CONSTEXPR type epsilon() {return type();}
+};
+
+template
+    <>
+class numeric_limits<bool>
+{
+public:
+    typedef bool type;
+
+#if 0 // not implemented
+    static const bool is_specialized = true;
+    static const bool is_signed = false;
+    static const bool is_integer = true;
+    static const bool is_exact = true;
+    static const bool has_infinity = false;
+    static const bool has_quiet_NaN = false;
+    static const bool has_signaling_NaN = false;
+    static const float_denorm_style has_denorm = denorm_absent;
+    static const bool has_denorm_loss = false;
+    static const float_round_style round_style = round_toward_zero;
+    static const bool is_iec559 = false;
+    static const bool is_bounded = false;
+    static const bool is_modulo = false;
+    static const int digits = 1;
+    static const int digits10 = 0;
+    static const int max_digits10 = 0;
+    static const int radix = 0;
+    static const int min_exponent = 0;
+    static const int min_exponent10 = 0;
+    static const int max_exponent = 0;
+    static const int max_exponent10 = 0;
+#endif
+
+    static SSTL_CONSTEXPR type min() {return false;}
+    static SSTL_CONSTEXPR type lowest() {return false;}
+    static SSTL_CONSTEXPR type max() {return true;}
+    static SSTL_CONSTEXPR type epsilon() {return false;}
+};
+
+template
+   <class T>
+class _numeric_limits_integer_base
+{
+public:
+    typedef T type;
+
+#if 0 // not implemented
+    static const bool is_specialized = true;
+    static const bool is_integer = true;
+    static const bool is_exact = true;
+    static const bool is_signed = static_cast<type>(-1) < static_cast<type>(0);
+    static const bool has_infinity = false;
+    static const bool has_quiet_NaN = false;
+    static const bool has_signaling_NaN = false;
+    static const float_denorm_style has_denorm = denorm_absent;
+    static const bool has_denorm_loss = false;
+    static const float_round_style round_style = round_toward_zero;
+    static const bool is_iec559 = false;
+    static const bool is_bounded = false;
+    static const bool is_modulo = true;
+    static const int digits = static_cast<int>(sizeof(type) * 8 - (is_signed ? 1 : 0));
+    static const int digits10 = (digits * 3) / 10; // approximation
+    static const int max_digits10 = 0;
+    static const int radix = 2;
+    static const int min_exponent = 0;
+    static const int min_exponent10 = 0;
+    static const int max_exponent = 0;
+    static const int max_exponent10 = 0;
+#endif
+
+    // These two are better than constants as
+    static SSTL_CONSTEXPR bool _is_signed() {return static_cast<type>(-1) < static_cast<type>(0);}
+    static SSTL_CONSTEXPR int _digits() {return static_cast<int>(sizeof(type) * 8 - (_is_signed() ? 1 : 0));}
+
+    static SSTL_CONSTEXPR type min() {return static_cast<type>(_is_signed() ? (static_cast<type>(1) << _digits()) : 0);}
+    static SSTL_CONSTEXPR type lowest() {return min();}
+    static SSTL_CONSTEXPR type max() {return static_cast<type>(_is_signed() ? ((~static_cast<type>(0)) ^ min()) : (~0));}
+    static SSTL_CONSTEXPR type epsilon() {return 0;}
+};
+
+template<> class numeric_limits<char> : public _numeric_limits_integer_base<char> {};
+template<> class numeric_limits<signed char> : public _numeric_limits_integer_base<signed char> {};
+template<> class numeric_limits<unsigned char> : public _numeric_limits_integer_base<unsigned char> {};
+template<> class numeric_limits<short> : public _numeric_limits_integer_base<short> {};
+template<> class numeric_limits<unsigned short> : public _numeric_limits_integer_base<unsigned short> {};
+template<> class numeric_limits<int> : public _numeric_limits_integer_base<int> {};
+template<> class numeric_limits<unsigned int> : public _numeric_limits_integer_base<unsigned int> {};
+template<> class numeric_limits<long> : public _numeric_limits_integer_base<long> {};
+template<> class numeric_limits<unsigned long> : public _numeric_limits_integer_base<unsigned long> {};
+template<> class numeric_limits<sstl_int64> : public _numeric_limits_integer_base<sstl_int64> {};
+template<> class numeric_limits<sstl_uint64> : public _numeric_limits_integer_base<sstl_uint64> {};
+
+template
+    <>
+class numeric_limits<float>
+{
+public:
+    typedef float type;
+
+#if 0 // not implemented
+    static const bool is_specialized = true;
+    static const bool is_integer = false;
+    static const bool is_exact = false;
+    static const bool is_signed = true;
+    static const bool has_infinity = true;
+    static const bool has_quiet_NaN = true;
+    static const bool has_signaling_NaN = true;
+    static const float_denorm_style has_denorm = denorm_present;
+    static const bool has_denorm_loss = false;
+    static const float_round_style round_style = round_to_nearest;
+    static const bool is_iec559 = true;
+    static const bool is_bounded = true;
+    static const bool is_modulo = false;
+    static const int radix = 2;
+    static const int digits = FLT_DIG;
+    static const int digits10 = (digits * 3) / 10;
+    static const int max_digits10 = 2 + FLT_DIG;
+    static const int min_exponent = FLT_MIN_EXP;
+    static const int min_exponent10 = FLT_MIN_10_EXP;
+    static const int max_exponent = FLT_MAX_EXP;
+    static const int max_exponent10 = FLT_MAX_10_EXP;
+#endif
+
+    static SSTL_CONSTEXPR type min() {return FLT_MIN;}
+    static SSTL_CONSTEXPR type lowest() {return -FLT_MAX;}
+    static SSTL_CONSTEXPR type max() {return FLT_MAX;}
+    static SSTL_CONSTEXPR type epsilon() {return FLT_EPSILON;}
+};
+
+template
+    <>
+class numeric_limits<double>
+{
+public:
+    typedef double type;
+
+#if 0 // not implemented
+    static const bool is_specialized = true;
+    static const bool is_integer = false;
+    static const bool is_exact = false;
+    static const bool is_signed = true;
+    static const bool has_infinity = true;
+    static const bool has_quiet_NaN = true;
+    static const bool has_signaling_NaN = true;
+    static const float_denorm_style has_denorm = denorm_present;
+    static const bool has_denorm_loss = false;
+    static const float_round_style round_style = round_to_nearest;
+    static const bool is_iec559 = true;
+    static const bool is_bounded = true;
+    static const bool is_modulo = false;
+    static const int radix = 2;
+    static const int digits = DBL_DIG;
+    static const int digits10 = (digits * 3) / 10;
+    static const int max_digits10 = 2 + DBL_DIG;
+    static const int min_exponent = DBL_MIN_EXP;
+    static const int min_exponent10 = DBL_MIN_10_EXP;
+    static const int max_exponent = DBL_MAX_EXP;
+    static const int max_exponent10 = DBL_MAX_10_EXP;
+#endif
+
+    static SSTL_CONSTEXPR type min() {return DBL_MIN;}
+    static SSTL_CONSTEXPR type lowest() {return -DBL_MAX;}
+    static SSTL_CONSTEXPR type max() {return DBL_MAX;}
+    static SSTL_CONSTEXPR type epsilon() {return DBL_EPSILON;}
+};
+
+} // namespace
+
+#endif

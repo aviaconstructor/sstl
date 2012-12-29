@@ -1,14 +1,20 @@
+#ifndef _SSTL__SSTL_CONVERSIONS_INCLUDED
+#define _SSTL__SSTL_CONVERSIONS_INCLUDED
+
+// Extra data type conversion helpers
+
 template
-  <typename T>
-size_t to_size_cast<T>(T v)
+  <typename To, typename From>
+To sstl_numeric_cast<To, From>(From v)
 {
 
 }
 
 template
   <typename T>
-unsigned from_size_cast<T>(T v)
+unsigned sstl_from_size_cast<T>(T v)
 {
 
 }
 
+#endif
