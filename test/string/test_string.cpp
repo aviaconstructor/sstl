@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
+#define TEST_NATIVE_STL
+
 #if defined(TEST_NATIVE_STL)
     #include <string>
     #include <iterator>
+    #include <sstl/sstl_common.h>
 
     using namespace std;
 #else
@@ -52,7 +55,7 @@ static void _check_string_iterators(string s, string::size_type size, char front
 
     ASSERT_EQ(&(*s.rend()), &s[0] - 1);
 
-#if !defined(TEST_NATIVE_STL) || __cplusplus >= 201100
+#if SSTL_CXX11
     ASSERT_EQ(&(*s.cbegin()), &s[0]);
     ASSERT_EQ(*s.cbegin(), front);
 
@@ -91,7 +94,7 @@ static void _check_string_size(string s, string::size_type size)
     s.append(static_cast<string::size_type>(diff), ' ');
     ASSERT_EQ(s.capacity(), s.size());
 
-    string::difference_type diff_from_maximum = static_cast<string::difference_type>(string::max_size() - s.size());
+    string::difference_type diff_from_maximum = static_cast<string::difference_type>(s.max_size() - s.size());
     ASSERT_GE(diff_from_maximum, 0);
 }
 

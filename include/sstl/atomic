@@ -1,3 +1,4 @@
+// -*- C++ -*-
 #ifndef _SSTL__ATOMIC_INCLUDED
 #define _SSTL__ATOMIC_INCLUDED
 
