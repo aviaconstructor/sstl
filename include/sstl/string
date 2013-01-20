@@ -5,6 +5,7 @@
 #include "sstl_common.h"
 #include "atomic"
 #include "iterator"
+#include "limits"
 
 namespace SSTL_NAMESPACE {
 
@@ -13,10 +14,11 @@ class string
     friend class _intern_holder;
 
 public:
-
     typedef char value_type;
     typedef sstl_size_t size_type;
     typedef sstl_ptrdiff_t difference_type;
+    typedef char& reference;
+    typedef const char& const_reference;
     typedef char* pointer;
     typedef const char* const_pointer;
     typedef char* iterator;
@@ -144,8 +146,8 @@ public:
     }
 
     template
-        <class Iterator>
-    string(Iterator from, Iterator to)
+        <class Iter>
+    string(Iter from, Iter to)
     {
         _set_uninitialized(from, to);
     }
@@ -160,7 +162,7 @@ public:
         _get_buffer()->_ref_decrement();
     }
 
-public: // Methods:
+public:
 
     iterator begin()  {unshare(); return _bytes;}
     iterator end()    {unshare(); return _bytes + size();}
@@ -202,9 +204,10 @@ public: // Methods:
         return _bytes[size() - 1];
     }
 
-    SSTL_CONSTEXPR static size_type max_size()
+    // In the standard max_size is not static
+    static SSTL_CONSTEXPR size_type max_size()
     {
-        return INT_MAX; // this is because difference_type should always work between two positions
+        return numeric_limits<difference_type>::max() / 2; // difference_type, not size_type because this is because difference_type should always work between two positions
     }
 
     // Get the number of characters in the string, zero character is not included.
@@ -641,6 +644,16 @@ public: // Methods:
         other._bytes = bytes;
     }
 
+    size_type find(char ch, size_type pos = 0) const;
+    size_type find(const char* s, size_type pos, size_type count) const;
+    size_type find(const char* s, size_type pos = 0) const     {return find(s, pos, strlen(s));}
+    size_type find(const string& str, size_type pos = 0) const {return find(str.data(), pos, str.size());}
+
+    size_type rfind(char ch, size_type pos = string::npos) const;
+    size_type rfind(const char* s, size_type pos, size_type count) const;
+    size_type rfind(const char* s, size_type pos = string::npos) const     {return rfind(s, pos, strlen(s));}
+    size_type rfind(const string& str, size_type pos = string::npos) const {return rfind(str.data(), pos, str.size());}
+
     bool is_shared() const
     {
         return _get_buffer()->_ref_count > 0;
@@ -656,7 +669,7 @@ public: // Methods:
     static string intern_create(const char* s, size_type size);
     static void intern_cleanup(time_t secondsSincePrevious = 60);
 
-private: // Methods:
+private:
 
     _buffer_type* _get_buffer()
     {
@@ -692,8 +705,8 @@ private: // Methods:
     }
 
     template
-        <class Iterator>
-    void _set_uninitialized(Iterator begin, Iterator end)
+        <class Iter>
+    void _set_uninitialized(Iter begin, Iter end)
     {
         SSTL_ASSERT(end >= begin);
         unsigned size = static_cast<unsigned>(end - begin);

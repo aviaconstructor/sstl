@@ -1,4 +1,5 @@
 #include "../string"
+#include "../algorithm"
 #include "../mutex"
 
 namespace SSTL_NAMESPACE {
@@ -164,6 +165,66 @@ bool string::operator==(const char* s) const
     if (len != size())
         return false;
     return memcmp(_bytes, s, len) == 0;
+}
+
+string::size_type string::find(char ch, size_type pos) const
+{
+   const_iterator i = cbegin() + pos;
+   const_iterator i_end = cend();
+   for ( ; i < i_end; ++i) // when pos >= size() return npos, as specified
+      if (*i == ch)
+         return i - cbegin();
+   return npos;
+}
+
+string::size_type string::find(const char* s, size_type pos, size_type count) const
+{
+    SSTL_ASSERT(s != NULL);
+    size_type len = size();
+    if (len - pos >= count && pos <= len)
+    {
+        if (count == 0) // this has to happen after the above if
+            return pos;
+        const char* d = data();
+        const char* d_end = data() + len;
+        const char* f = SSTL_NAMESPACE::search(d + pos, d_end, s, s + count);
+        if (f < d_end)
+            return static_cast<string::size_type>(f - d);
+    }
+    return npos;
+}
+
+string::size_type string::rfind(char ch, size_type pos) const
+{
+    size_type len = size();
+    if (len != 0)
+    {
+        const char* d = data();
+        const char* i = d + (pos < len ? pos : len - 1);
+        for (; i >= d; --i)
+            if (*i == ch)
+                return static_cast<string::size_type>(i - d);
+    }
+    return npos;
+}
+
+string::size_type string::rfind(const char* s, size_type pos, size_type count) const
+{
+    SSTL_ASSERT(s != NULL);
+    size_type len = size();
+    if (pos < len && len - pos >= count)
+        pos += count;
+    else
+        pos = len;
+    if (count == 0)
+        return pos;
+
+    const char* d = data();
+    const char* d_end = d + pos;
+    const char* f = SSTL_NAMESPACE::find_end(d, d_end, s, s + count);
+    if (f < d_end)
+        return static_cast<string::size_type>(f - d);
+    return npos;
 }
 
 void string::_reallocate(size_type new_capacity) const

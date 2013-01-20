@@ -1,6 +1,6 @@
 // -*- C++ -*-
-#ifndef _SSTL__MUTEX
-#define _SSTL__MUTEX
+#ifndef _SSTL__MUTEX_INCLUDED
+#define _SSTL__MUTEX_INCLUDED
 
 #include "sstl_common.h"
 

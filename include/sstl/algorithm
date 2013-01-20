@@ -1,0 +1,107 @@
+// -*- C++ -*-
+#ifndef _SSTL__ALGORITHM_INCLUDED
+#define _SSTL__ALGORITHM_INCLUDED
+
+#include "sstl_common.h"
+#include "iterator"
+
+namespace SSTL_NAMESPACE {
+
+template
+    <typename A, typename B>
+struct _equality_predicate
+{
+    bool operator()(const A& a, const B& b) const {return a == b;}
+};
+
+// sstl::search(...)
+
+template
+   <class P, class IS, class IP>
+IS search(IS source_begin, IS source_end, IP pattern_begin, IP pattern_end, P predicate)
+{
+    SSTL_ASSERT(source_begin <= source_end && pattern_begin <= pattern_end);
+    typename SSTL_NAMESPACE::iterator_traits<IP>::difference_type pattern_size = pattern_end - pattern_begin;
+    if (pattern_size == 0)
+        return source_begin;
+    if ((source_end - source_begin) >= pattern_size)
+    {
+        const IS end = source_end + 1 - pattern_size;
+        for (IS i = source_begin; i < end; ++i)
+        {
+            if (predicate(*i, *pattern_begin))
+            {
+                IS j = i;
+                IP k = pattern_begin;
+                for (;;)
+                {
+                    ++k;
+                    if (k == pattern_end)
+                        return i;
+                    ++j;
+                    if (!predicate(*j, *k))
+                        break;
+                }
+            }
+        }
+    }
+    return source_end;
+}
+
+template
+   <class IS, class IP>
+IS search(IS source_begin, IS source_end, IP pattern_begin, IP pattern_end)
+{
+    typedef typename iterator_traits<IS>::value_type is_value_type;
+    typedef typename iterator_traits<IS>::value_type ip_value_type;
+    return SSTL_NAMESPACE::search(source_begin, source_end, pattern_begin, pattern_end,
+                                  SSTL_NAMESPACE::_equality_predicate<is_value_type, ip_value_type>());
+}
+
+// sstl::find_end(...)
+
+template
+   <class P, class IS, class IP>
+IS find_end(IS source_begin, IS source_end, IP pattern_begin, IP pattern_end, P predicate)
+{
+    SSTL_ASSERT(source_begin <= source_end && pattern_begin <= pattern_end);
+    typename SSTL_NAMESPACE::iterator_traits<IP>::difference_type pattern_size = pattern_end - pattern_begin;
+    if (pattern_size == 0)
+        return source_end;
+    if ((source_end - source_begin) >= pattern_size)
+    {
+        for (IS i = source_end - pattern_size; i >= source_begin; --i)
+        {
+            if (predicate(*i, *pattern_begin))
+            {
+                IS j = i;
+                IP k = pattern_begin;
+                for (;;)
+                {
+                    ++k;
+                    if (k == pattern_end)
+                        return i;
+                    ++j;
+                    if (!predicate(*j, *k))
+                        break;
+                }
+            }
+        }
+    }
+    return source_end;
+}
+
+template
+   <class IS, class IP>
+IS find_end(IS source_begin, IS source_end, IP pattern_begin, IP pattern_end)
+{
+    typedef typename iterator_traits<IS>::value_type is_value_type;
+    typedef typename iterator_traits<IS>::value_type ip_value_type;
+    return SSTL_NAMESPACE::find_end(source_begin, source_end, pattern_begin, pattern_end,
+                                  SSTL_NAMESPACE::_equality_predicate<is_value_type, ip_value_type>());
+}
+
+
+} // namespace
+
+#endif
