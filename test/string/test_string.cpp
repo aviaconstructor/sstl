@@ -2,7 +2,7 @@
 
 //#define TEST_NATIVE_STL
 
-#if defined(TEST_NATIVE_STL)
+#if defined(SSTL_TEST_NATIVE_STL)
     #include <string>
     #include <iterator>
     #include <sstl/sstl_common.h>
@@ -16,14 +16,85 @@
     using namespace SSTL_NAMESPACE;
 #endif
 
+TEST(test_string, types)
+{
+    SSTL_STATIC_ASSERT(typeid(char) == typeid(string::value_type), "value type is bad");
+
+    ASSERT_EQ(0, numeric_limits<string::size_type>::min()); // unsigned
+    ASSERT_LE(numeric_limits<unsigned>::max(), numeric_limits<string::size_type>::max());
+    ASSERT_GE(numeric_limits<int>::min(), numeric_limits<string::difference_type>::min()); // signed
+
+    SSTL_STATIC_ASSERT(typeid(char&) == typeid(string::reference), "reference type uis bad");
+    SSTL_STATIC_ASSERT(typeid(const char&) == typeid(string::const_reference), "const reference type is bad");
+    SSTL_STATIC_ASSERT(typeid(char*) == typeid(string::pointer), "pointer type uis bad");
+    SSTL_STATIC_ASSERT(typeid(const char*) == typeid(string::const_pointer), "const pointer type is bad");
+
+#if !defined(SSTL_TEST_NATIVE_STL)
+    ASSERT_EQ(32, sizeof(string::_buffer_type));
+#endif
+}
+
+TEST(test_string, constructors)
+{
+    string s1 = "AAAAAAAAAAAAAAAA";
+    string s2("AAAAAAAAAAAAAAAA");
+    string s3("AAAAAAAAAAAAAAAA", 16);
+    string s4(16, 'A');
+    string s5(s1);
+
+    ASSERT_EQ(s1, s2);
+    ASSERT_EQ(s1, s3);
+    ASSERT_EQ(s1, s4);
+    ASSERT_EQ(s1, s5);
+}
+
+TEST(test_string, assign)
+{
+    string s1 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    string s2;
+    string s3;
+    string s4;
+    string s5;
+    string s6;
+
+    s2 = s1;
+    s3.assign(s2);
+    s4.assign(s1.c_str());
+    s5.assign(s4.data(), s4.size());
+    s6.assign(s4.size(), 'A');
+
+    ASSERT_EQ(s1, s2);
+    ASSERT_EQ(s1, s3);
+    ASSERT_EQ(s1, s4);
+    ASSERT_EQ(s1, s5);
+    ASSERT_EQ(s1, s6);
+}
+
+TEST(test_string, clear)
+{
+    string s = "01234567";
+    s.clear();
+    ASSERT_EQ(0, s.size());
+    ASSERT_EQ(0, s.length()); // alias to size
+    ASSERT_LE(0, s.capacity()); // still the buffer is allocated
+
+    string s1 = "1";
+    string s2 = s1;
+    s1.clear();
+    ASSERT_EQ(0, s1.size());
+    ASSERT_EQ(0, s1.length()); // alias to size
+    ASSERT_EQ(1, s2.size()); // the other buffer stays unchanged
+    ASSERT_EQ(1, s2.length()); // alias to size
+}
+
 static void _check_string_indexing(string& s, string::size_type size)
 {
-    ASSERT_EQ(s.size(), size);
+    ASSERT_EQ(size, s.size());
     for (int i = 0; i < size; ++i)
     {
         char c = (i & 0x7) + '0';  // by convention
-        ASSERT_EQ(s.at(i), c);
-        ASSERT_EQ(s[i], c);
+        ASSERT_EQ(c, s.at(i));
+        ASSERT_EQ(c, s[i]);
     }
 }
 
@@ -85,9 +156,9 @@ TEST(test_string, iterators)
 static void _check_string_size(string s, string::size_type size)
 {
     ASSERT_EQ(s.empty(), (s.size() == 0));
-    ASSERT_EQ(s.size(), size);
-    ASSERT_EQ(s.length(), size);
-    ASSERT_GE(s.capacity(), size);
+    ASSERT_EQ(size, s.size());
+    ASSERT_EQ(size, s.length());
+    ASSERT_LE(size, s.capacity());
 
     // When the string completes its length to capacity, the capacity becomes equal to size
     string::difference_type diff = static_cast<string::difference_type>(s.capacity() - s.size());
@@ -95,7 +166,7 @@ static void _check_string_size(string s, string::size_type size)
     ASSERT_EQ(s.capacity(), s.size());
 
     string::difference_type diff_from_maximum = static_cast<string::difference_type>(s.max_size() - s.size());
-    ASSERT_GE(diff_from_maximum, 0);
+    ASSERT_LE(0, diff_from_maximum);
 }
 
 TEST(test_string, size)
@@ -106,7 +177,88 @@ TEST(test_string, size)
 
     _check_string_size(string("12"), 2);
     _check_string_size(string("0123456789"), 10);
+
+    ASSERT_LE(numeric_limits<short>::max(), string().max_size()); // in reality it is bigger
 }
+
+TEST(test_string, c_str_data)
+{
+    string s = "abcdef";
+
+    ASSERT_EQ(6, s.size());
+    ASSERT_TRUE(strcmp(s.c_str(), "abcdef") == 0);
+    ASSERT_TRUE(memcmp(s.data(), "abcdef", 6) == 0);
+
+    const char* saved_data = s.data();
+    s = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
+    ASSERT_EQ(100, s.size());
+    s += s;
+    ASSERT_EQ(200, s.size());
+
+    ASSERT_NE(saved_data, s.data()); // any sane implementation would reallocate memory
+    ASSERT_NE(saved_data, s.c_str());
+    for (int i = 0; i < 200; i += 10)
+        ASSERT_TRUE(memcmp(s.data() + i, "0123456789", 10) == 0);
+}
+
+TEST(test_string, reserve_resize)
+{
+    string s1 = "abc";
+    string s2 = s1;
+    ASSERT_LE(s1.size(), s1.capacity());
+    string::size_type saved_size = s1.size();
+    ASSERT_EQ(3, saved_size); // sure
+    string::size_type saved_capacity = s1.capacity();
+
+    s1.reserve(100); // surely bigger than the default capacity
+
+    ASSERT_EQ("abc", s1); // ensure the value stayed
+    ASSERT_EQ(saved_size, s1.size());
+    ASSERT_LT(saved_capacity, s1.capacity());
+    ASSERT_LE(100, s1.capacity());
+
+    ASSERT_EQ("abc", s2); // ensure all properties of s2 stayed s1.reserve()
+    ASSERT_EQ(saved_size, s2.size());
+    ASSERT_EQ(saved_capacity, s2.capacity());
+
+    s2.resize(16);
+    ASSERT_EQ(string("abc\0\0\0\0\0\0\0\0\0\0\0\0\0", 16), s2); // this verifies size also
+
+    s2.resize(17);
+    ASSERT_EQ(string("abc\0\0\0\0\0\0\0\0\0\0\0\0\0\0", 17), s2); // this verifies size also
+
+    s2.resize(1);
+    ASSERT_EQ(string("a", 1), s2); // this verifies size also
+
+    s2.resize(8);
+    ASSERT_EQ(string("a\0\0\0\0\0\0\0", 8), s2); // this verifies size also
+
+    s2.resize(0);
+    ASSERT_EQ(string(), s2); // this verifies size also
+
+    s2.resize(1);
+    ASSERT_EQ(string("\0", 1), s2); // this verifies size also
+}
+
+#if defined(SSTL_CXX11) && SSTL_CXX11 != 0
+TEST(test_string, shrink_to_fit)
+{
+    string s(1551, '#');
+
+    string::size_type saved_size = s.size();
+    ASSERT_EQ(1551, saved_size); // sure
+    string::size_type saved_capacity = s.capacity();
+    ASSERT_LE(1551, saved_capacity);
+
+    s.resize(10);
+    ASSERT_EQ(1551, saved_size); // sure
+    ASSERT_EQ(saved_capacity, s.capacity()); // capacity should not change
+
+    s.shrink_to_fit();
+    ASSERT_GT(saved_capacity, s.capacity()); // capacity should become smaller
+    ASSERT_GE(64, s.capacity());             // somewhat much smaller
+}
+#endif
 
 static void _check_find(const string& s, char c, string::size_type pos, string::size_type expected)
 {

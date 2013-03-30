@@ -15,8 +15,8 @@ class string
 
 public:
     typedef char value_type;
-    typedef sstl_size_t size_type;
-    typedef sstl_ptrdiff_t difference_type;
+    typedef sstl_size_type size_type;
+    typedef sstl_difference_type difference_type;
     typedef char& reference;
     typedef const char& const_reference;
     typedef char* pointer;
@@ -108,14 +108,13 @@ public: // Constants:
 
     static const size_type npos = 0xFFFFFFFF;
     static const unsigned _buffer_type_header_sizeof = sizeof(_buffer_type) - sizeof(sstl_uint64) * 2;
-    static const unsigned _minimum_capacity = sizeof(sstl_uint64) * 2;
+    static const unsigned _capacity_granularity = sizeof(sstl_uint64) * 2;
 
 public:
 
     string()
     {
-        _empty_string_buffer._ref_increment();
-        _bytes = _empty_string_buffer._bytes;
+        _clear_uninitizlized();
     }
 
     /// Construct the string from the given buffer, give the buffer directly.
@@ -207,7 +206,7 @@ public:
     // In the standard max_size is not static
     static SSTL_CONSTEXPR size_type max_size()
     {
-        return numeric_limits<difference_type>::max() / 2; // difference_type, not size_type because this is because difference_type should always work between two positions
+        return numeric_limits<size_type>::max() / 2; // maximum size is twice smaller because the difference between two indexes is an integer
     }
 
     // Get the number of characters in the string, zero character is not included.
@@ -347,18 +346,11 @@ public:
 
     void resize(size_type new_size);
 
-    void clear()
-    {
-        if (_bytes != _empty_string_buffer._bytes)
-        {
-            _get_buffer()->_ref_decrement();
-            _bytes = _empty_string_buffer._bytes;
-        }
-    }
+    void clear();
 
     static unsigned static_hash(const char* p, size_type size);
 
-    unsigned hash()
+    unsigned hash() const
     {
         return static_hash(_bytes, size());
     }
@@ -664,6 +656,8 @@ public:
         return _get_buffer()->_hash != 0;
     }
 
+    char* unshare();
+
     void intern();
     static string intern_create(const char* s);
     static string intern_create(const char* s, size_type size);
@@ -680,29 +674,19 @@ private:
         return reinterpret_cast<const _buffer_type*>(_bytes - _buffer_type_header_sizeof); // offset from header
     }
 
+    void _clear_uninitizlized();
+
     void _set_uninitialized(char c)
     {
         _bytes = _new_uninitialized(1);
         _bytes[0] = c;
     }
 
-    void _set_uninitialized(const char* str)
-    {
-        const size_type len = static_cast<size_type>(strlen(str));
-        _set_uninitialized(str, len);
-    }
+    void _set_uninitialized(const char* str);
 
-    void _set_uninitialized(const char* str, size_type size)
-    {
-        _bytes = _new_uninitialized(size);
-        memcpy(_bytes, str, size);
-    }
+    void _set_uninitialized(const char* str, size_type size);
 
-    void _set_uninitialized(size_type size, char c)
-    {
-        _bytes = _new_uninitialized(size);
-        memset(_bytes, c, size);
-    }
+    void _set_uninitialized(size_type size, char c);
 
     template
         <class Iter>
@@ -713,14 +697,7 @@ private:
         _set_uninitialized(static_cast<const char*>(&*begin), size);
     }
 
-    void _set_uninitialized(const string& other)
-    {
-        SSTL_ASSERT(&other != this);
-        other._get_buffer()->_ref_increment();
-        _bytes = other._bytes;
-    }
-
-    void unshare();
+    void _set_uninitialized(const string& other);
 
     char* _insert_uninitialized(size_type index, size_type count);
 

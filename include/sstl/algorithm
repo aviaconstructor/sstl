@@ -101,6 +101,16 @@ IS find_end(IS source_begin, IS source_end, IP pattern_begin, IP pattern_end)
                                   SSTL_NAMESPACE::_equality_predicate<is_value_type, ip_value_type>());
 }
 
+// sstl::swap(...)
+
+template
+   <class T>
+void swap(T& a, T& b)
+{
+    T c = a;
+    a = b;
+    b = c;
+}
 
 } // namespace
 

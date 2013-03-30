@@ -1,0 +1,90 @@
+// -*- C++ -*-
+#ifndef _SSTL__ALLOCATOR_INCLUDED
+#define _SSTL__ALLOCATOR_INCLUDED
+
+#include "sstl_common.h"
+#include "atomic"
+#include "iterator"
+
+namespace SSTL_NAMESPACE {
+
+// SSTL allocator is not standard as it takes care of sequences, not individual objects
+
+/// Plain Old Data allocator
+///
+/// This allocator is suitable for sequences of items with no constructor or destructor.
+/// Also, items should be movable in memory.
+///
+class allocator_base
+{
+public:
+    allocator_base()
+        : _buffer(NULL), _size(0), _capacity(0)
+    {}
+
+    ~allocator_base()
+    {
+        _delete_buffer();
+    }
+
+    void operator=(const allocator_base& v);
+    bool operator==(const allocator_base& v) const;
+    bool operator!=(const allocator_base& v) const
+    {
+        return !operator==(v);
+    }
+
+    char* data() {return _buffer;}
+    const char* cdata() const {return _buffer;}
+
+    char* begin() {return _buffer;}
+    char* end()   {return _buffer + _size;}
+
+    char* cbegin() const {return _buffer;}
+    char* cend() const   {return _buffer + _size;}
+
+    sstl_size_type size() const {return _size;}
+    sstl_size_type capacity() const {return _capacity;}
+
+    void reserve(sstl_size_type n);
+
+    void shrink_to_fit();
+
+    char* operator[](sstl_size_type n)
+    {
+        SSTL_ASSERT(n < _size);
+        return _buffer + n;
+    }
+
+    const char* operator[](sstl_size_type n) const
+    {
+        SSTL_ASSERT(n < _size);
+        return _buffer + n;
+    }
+
+    char* insert(sstl_size_type n, sstl_size_type count);
+    void erase(sstl_size_type n, sstl_size_type count);
+    void shrink(sstl_size_type new_size)
+    {
+        SSTL_ASSERT(new_size <= _size);
+        _size = new_size;
+    }
+    char* grow(sstl_size_type n);
+    void clear() {_size = 0;}
+
+    void swap(allocator_base& other);
+
+private:
+
+    void _delete_buffer();
+
+private:
+
+    char* _buffer;
+    sstl_size_type _size;
+    sstl_size_type _capacity;
+};
+
+} // namespace
+
+#endif

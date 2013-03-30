@@ -27,7 +27,7 @@
 #endif
 
 #if !defined(SSTL_STATIC_ASSERT)
-    #define SSTL_STATIC_ASSERT(expression, str)  typedef char _sstl__static_assert_ ## __LINE__ [((expression) && (str)) ? 1 : -1]
+    #define SSTL_STATIC_ASSERT(expression, str)  typedef char SSTL_MACRO_CONCATENATE(_sstl__static_assert_, __LINE__) [((expression) && (str)) ? 1 : -1]
 #endif
 
 #if !defined(SSTL_ASSERT)

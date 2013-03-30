@@ -7,12 +7,16 @@ namespace SSTL_NAMESPACE {
 string::_buffer_type string::_empty_string_buffer;
 string string::_empty_string(&string::_empty_string_buffer);
 
-inline unsigned _adjust_capacity(unsigned size)
+inline sstl_size_type _adjust_capacity(sstl_size_type size)
 {
-    unsigned result = (size < string::_minimum_capacity) ? string::_minimum_capacity : size;
-    result += 7;
-    result &= ~7; // round up to the nearest 8
-    return result;
+    SSTL_ASSERT(size < numeric_limits<sstl_size_type>::max() - string::_capacity_granularity);
+
+    const sstl_size_type _capacity_bits = string::_capacity_granularity - 1;
+    SSTL_STATIC_ASSERT((string::_capacity_granularity & _capacity_bits) == 0, "_capacity_granularity should be the power of two");
+
+    size += _capacity_bits;
+    size &= ~_capacity_bits; // round up to the nearest value divisible by _capacity_granularity
+    return size;
 }
 
 void string::reserve(size_type reserved_size)
@@ -111,6 +115,20 @@ string& string::erase(size_type pos, size_type count)
         _get_buffer()->_size -= count;
     }
     return *this;
+}
+
+void string::clear()
+{
+    if (_bytes != _empty_string_buffer._bytes)
+    {
+        if ( is_shared() ) // minimize hassle depending on whether or not this is shared
+        {
+            _get_buffer()->_ref_decrement();
+            _clear_uninitizlized();
+        }
+        else
+            _get_buffer()->_size = 0;
+    }
 }
 
 int string::compare(const string& s) const
@@ -238,10 +256,51 @@ void string::_reallocate(size_type new_capacity) const
     _bytes = buff->_bytes;
 }
 
+void string::_clear_uninitizlized()
+{
+    _empty_string_buffer._ref_increment();
+    _bytes = _empty_string_buffer._bytes;
+}
+
+void string::_set_uninitialized(const char* str)
+{
+    const size_type len = static_cast<size_type>(strlen(str));
+    _set_uninitialized(str, len);
+}
+
+void string::_set_uninitialized(const char* str, size_type size)
+{
+    if (size == 0)
+        _clear_uninitizlized();
+    else
+    {
+        _bytes = _new_uninitialized(size);
+        memcpy(_bytes, str, size);
+    }
+}
+
+void string::_set_uninitialized(size_type size, char c)
+{
+    if (size == 0)
+        _clear_uninitizlized();
+    else
+    {
+        _bytes = _new_uninitialized(size);
+        memset(_bytes, c, size);
+    }
+}
+
+void string::_set_uninitialized(const string& other)
+{
+    SSTL_ASSERT(&other != this);
+    other._get_buffer()->_ref_increment();
+    _bytes = other._bytes;
+}
+
 string::_buffer_type* string::_new_uninitialized_buffer(size_type size, size_type capacity)
 {
     SSTL_ASSERT(size <= capacity);
-    SSTL_ASSERT(capacity >= _minimum_capacity);
+    SSTL_ASSERT(capacity >= _capacity_granularity);
     unsigned buffer_sizeof = _buffer_type_header_sizeof + capacity;
     _buffer_type* buff = reinterpret_cast<_buffer_type*>(new char[buffer_sizeof]);
     buff->_hash = 0;
@@ -256,7 +315,7 @@ char* string::_new_uninitialized(size_type size)
     return _new_uninitialized_buffer(size, _adjust_capacity(size))->_bytes;
 }
 
-void string::unshare()
+char* string::unshare()
 {
     _buffer_type* buff = _get_buffer();
     if (buff->_ref_count > 0)
@@ -265,11 +324,13 @@ void string::unshare()
         memcpy(bytes, _bytes, buff->_size);
         _get_buffer()->_ref_decrement();
         _bytes = bytes;
+        return bytes;
     }
     else
     {
         SSTL_ASSERT(!is_interned()); // attempt to modify a non-referenced interned string is made somehow
     }
+    return NULL;
 }
 
 char* string::_append_uninitialized(size_type count)
@@ -374,10 +435,9 @@ public:
             if (buff != &string::_empty_string_buffer)
             {
                 buff->_ref_decrement();
-                str._bytes = string::_empty_string_buffer._bytes;
-                string::_empty_string_buffer._ref_increment();
+                str._clear_uninitizlized();
             }
-            return;
+            return; // empty string should not be interned into a hash table
         }
         SSTL_ASSERT(buff->_hash == 0); // otherwise we would not be here
         buff->_hash = string::static_hash(buff->_bytes, buff->_size);

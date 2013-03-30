@@ -9,7 +9,9 @@ if(_SOURCE_AND_BINARY_DIRS_ARE_THE_SAME)
                          3. Make the make file created")
 endif()
 
-option(SSTL_SHARED_LIBRARY "Create shared library (so or dll), otherwise statically linked" OFF)
+option(SSTL_SHARED_LIBRARY  "Create shared library (so or dll), otherwise statically linked" OFF)
+option(SSTL_TEST_SSTL       "Build SSTL tests" ON)
+option(SSTL_TEST_NATIVE_STL "Test environment's native STL with SSTL tests" ON)
 
 set(PACKAGE_NAME ${CMAKE_PROJECT_NAME})
 set(PACKAGE_VERSION 0.1)
@@ -19,4 +21,6 @@ enable_testing()
 
 include_directories(include)
 add_subdirectory(lib/sstl)
-add_subdirectory(test)
+if(SSTL_TEST_SSTL OR SSTL_TEST_NATIVE_STL)
+   add_subdirectory(test)
+endif()

@@ -3,7 +3,14 @@ cmake_minimum_required(VERSION 2.8)
 
 include_directories(${GTEST_INCLUDE_DIR})
 
-add_executable(test_limits test_limits.cpp)
-target_link_libraries(test_limits ${GTEST_BOTH_LIBRARIES})
-
-add_test(NAME test_limits COMMAND test_limits)
+if(SSTL_TEST_SSTL)
+    add_executable(test_limits test_limits.cpp)
+    target_link_libraries(test_limits ${GTEST_BOTH_LIBRARIES})
+    add_test(NAME test_limits COMMAND test_limits)
+endif()
+if(SSTL_TEST_NATIVE_STL)
+    add_definitions(-DSSTL_TEST_NATIVE_STL=1)
+    add_executable(test_limits_native_stl test_limits.cpp)
+    target_link_libraries(test_limits_native_stl ${GTEST_BOTH_LIBRARIES})
+    add_test(NAME test_limits_native_stl COMMAND test_limits_native_stl)
+endif()

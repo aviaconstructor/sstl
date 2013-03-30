@@ -14,8 +14,22 @@
 ///@}
 
 #if !defined(SSTL_EXTERNAL_SIZE_TYPEDEFS) || SSTL_EXTERNAL_SIZE_TYPEDEFS == 0
-    typedef size_t    sstl_size_t;
-    typedef ptrdiff_t sstl_ptrdiff_t;
+
+    /// Size type as used by sstl in containers
+    ///
+    /// By purpose, even for 64-bit platforms, it is unsigned, which is 32-bits in most architectures.
+    /// This can be changed by defining sstl_size_type outside and defining the macro
+    /// SSTL_EXTERNAL_SIZE_TYPEDEFS to 1.
+    ///
+    typedef unsigned sstl_size_type;
+
+    /// Difference type as used by sstl in containers
+    ///
+    /// By purpose, even for 64-bit platforms, it is int, which is 32-bits in most architectures.
+    /// This can be changed by defining sstl_size_type outside and defining the macro
+    /// SSTL_EXTERNAL_SIZE_TYPEDEFS to 1.
+    ///
+    typedef int sstl_difference_type;
 #endif
 
 #endif

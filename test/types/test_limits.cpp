@@ -2,9 +2,7 @@
 #include <float.h>
 #include <limits.h>
 
-//#define TEST_NATIVE_STL
-
-#if defined(TEST_NATIVE_STL)
+#if defined(SSTL_TEST_NATIVE_STL)
     #include <limits>
     #include <sstl/sstl_common.h>
 
