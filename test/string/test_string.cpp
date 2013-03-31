@@ -41,33 +41,52 @@ TEST(test_string, constructors)
     string s3("AAAAAAAAAAAAAAAA", 16);
     string s4(16, 'A');
     string s5(s1);
-
+    string s6(s1, 0, 16);
     ASSERT_EQ(s1, s2);
     ASSERT_EQ(s1, s3);
     ASSERT_EQ(s1, s4);
     ASSERT_EQ(s1, s5);
+    ASSERT_EQ(s1, s6);
+
+    string s7(string("012345678901234567890123456789"), 0, 10);
+    ASSERT_EQ(string("0123456789"), s7);
+
+    string s8(string("012345678901234567890123456789"), 9, 5);
+    ASSERT_EQ(string("90123"), s8);
+
+    string s9(string("012345678901234567890123456789"), 2);
+    ASSERT_EQ(string("2345678901234567890123456789"), s9);
 }
 
 TEST(test_string, assign)
 {
-    string s1 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-    string s2;
-    string s3;
-    string s4;
-    string s5;
+    string s1 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    string s2 = "abc";
+    string s3 = "abcdefghijABCDEFGHIJabcdefghijABCDEFGHIJ";
+    string s4(500, 'z');
+    string s5(1000, '\0');
     string s6;
+    string s7;
+    string s8;
+    string s9(10000, 'q');
 
     s2 = s1;
     s3.assign(s2);
     s4.assign(s1.c_str());
     s5.assign(s4.data(), s4.size());
     s6.assign(s4.size(), 'A');
+    s7.assign(s6, 0, s6.size());
+    s8.assign(s7, 0, 1000); // will be truncated to size()
+    s9.assign(s8, 0, string::npos);
 
     ASSERT_EQ(s1, s2);
     ASSERT_EQ(s1, s3);
     ASSERT_EQ(s1, s4);
     ASSERT_EQ(s1, s5);
     ASSERT_EQ(s1, s6);
+    ASSERT_EQ(s1, s7);
+    ASSERT_EQ(s1, s8);
+    ASSERT_EQ(s1, s9);
 }
 
 TEST(test_string, clear)

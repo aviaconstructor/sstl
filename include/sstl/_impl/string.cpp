@@ -19,6 +19,45 @@ inline sstl_size_type _adjust_capacity(sstl_size_type size)
     return size;
 }
 
+string& string::assign(size_type size, char c)
+{
+    if (size == 0)
+        clear();
+    else if (is_shared() || capacity() < size)
+    {
+        _get_buffer()->_ref_decrement();
+        _set_uninitialized(size, c);
+    }
+    else
+    {
+        _get_buffer()->_size = size;
+        memset(_bytes, c, size);
+    }
+    return *this;
+}
+
+string& string::assign(const char* str)
+{
+    return assign(str, static_cast<size_type>(strlen(str)));
+}
+
+string& string::assign(const char* str, size_type size)
+{
+    if (size == 0)
+        clear();
+    else if (is_shared() || capacity() < size)
+    {
+        _get_buffer()->_ref_decrement();
+        _set_uninitialized(str, size);
+    }
+    else
+    {
+        _get_buffer()->_size = size;
+        memcpy(_bytes, str, size);
+    }
+    return *this;
+}
+
 void string::reserve(size_type reserved_size)
 {
     if (reserved_size > capacity())

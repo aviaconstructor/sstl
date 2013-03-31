@@ -112,10 +112,14 @@ public:
         return *(cend() - 1);
     }
 
-    // In the standard max_size is not static
+    /// Maximum possible size of the vector, as determined by the limits of the involved types
+    ///
+    /// Different from C++ standard in SSTL this method is static, callable without instance.
+    /// The real maximum size can be limited by the available memory.
+    ///
     static SSTL_CONSTEXPR size_type max_size()
     {
-        return numeric_limits<difference_type>::max(); //  // difference_type, not size_type because this is because difference_type should always work between two positions
+        return numeric_limits<size_type>::max() / 2 / sizeof(T);
     }
 
     size_type size() const

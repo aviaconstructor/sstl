@@ -139,16 +139,31 @@ public:
         _set_uninitialized(s, size);
     }
 
+    string(const string& str, size_type pos, size_type count = string::npos)
+    {
+        SSTL_ASSERT(str.size() >= pos);
+        const size_type max_count = str.size() - pos;
+        if (count > max_count)
+            count = max_count;
+        _set_uninitialized(str.data() + pos, count);
+    }
+
     string(size_type size, char c)
     {
         _set_uninitialized(size, c);
     }
 
+    /// Assign string from an iterator range
+    ///
+    /// The current implementation supports only forward bidirectional iterators!
+    ///
     template
         <class Iter>
-    string(Iter from, Iter to)
+    string(Iter begin, Iter end)
     {
-        _set_uninitialized(from, to);
+        SSTL_ASSERT(end >= begin);
+        const size_type size = static_cast<size_type>(end - begin);
+        _set_uninitialized(static_cast<const char*>(&*begin), size);
     }
 
     string(const string& other)
@@ -203,23 +218,28 @@ public:
         return _bytes[size() - 1];
     }
 
-    // In the standard max_size is not static
+    /// Maximum possible size of the string, as determined by the limits of the involved types
+    ///
+    /// Different from C++ standard in SSTL this method is static, callable without instance.
+    /// The real maximum size can be limited by the available memory.
+    ///
     static SSTL_CONSTEXPR size_type max_size()
     {
         return numeric_limits<size_type>::max() / 2; // maximum size is twice smaller because the difference between two indexes is an integer
     }
 
-    // Get the number of characters in the string, zero character is not included.
-    //
+    ///@{
+    /// Get the number of characters in the string, zero character is not included.
+    ///
     size_type size() const
     {
         return _get_buffer()->_size;
     }
-
     size_type length() const
     {
         return size();
     }
+    ///@}
 
     bool empty() const
     {
@@ -248,9 +268,7 @@ public:
 
     string& operator=(char c)
     {
-        _get_buffer()->_ref_decrement();
-        _set_uninitialized(c);
-        return *this;
+        return assign(1, c);
     }
 
     string& operator=(const char* str)
@@ -263,25 +281,23 @@ public:
         return assign(other);
     }
 
-    string& assign(size_type size, char c)
-    {
-        _get_buffer()->_ref_decrement();
-        _set_uninitialized(size, c);
-        return *this;
-    }
+    string& assign(size_type size, char c);
 
-    string& assign(const char* str)
-    {
-        _get_buffer()->_ref_decrement();
-        _set_uninitialized(str);
-        return *this;
-    }
+    string& assign(const char* str);
 
-    string& assign(const char* str, size_type size)
+    string& assign(const char* str, size_type size);
+
+    /// Assign string from an iterator range
+    ///
+    /// The current implementation supports only forward bidirectional iterators!
+    ///
+    template
+        <class Iter>
+    string& assign(Iter begin, Iter end)
     {
-        _get_buffer()->_ref_decrement();
-        _set_uninitialized(str, size);
-        return *this;
+        SSTL_ASSERT(end >= begin);
+        const size_type size = static_cast<size_type>(end - begin);
+        return assign(static_cast<const char*>(&*begin), size);
     }
 
     string& assign(const string& other)
@@ -292,6 +308,15 @@ public:
             _set_uninitialized(other);
         }
         return *this;
+    }
+
+    string& assign(const string& str, size_type pos, size_type count)
+    {
+        SSTL_ASSERT(str.size() >= pos);
+        const size_type max_count = str.size() - pos;
+        if (count > max_count)
+            count = max_count;
+        assign(str.data() + pos, count);
     }
 
     string& operator+=(char c)
@@ -687,15 +712,6 @@ private:
     void _set_uninitialized(const char* str, size_type size);
 
     void _set_uninitialized(size_type size, char c);
-
-    template
-        <class Iter>
-    void _set_uninitialized(Iter begin, Iter end)
-    {
-        SSTL_ASSERT(end >= begin);
-        unsigned size = static_cast<unsigned>(end - begin);
-        _set_uninitialized(static_cast<const char*>(&*begin), size);
-    }
 
     void _set_uninitialized(const string& other);
 
