@@ -19,6 +19,16 @@ inline sstl_size_type _adjust_capacity(sstl_size_type size)
     return size;
 }
 
+string& string::assign(const string& other)
+{
+    if (this != &other) // otherwise the string might get deleted
+    {
+        _get_buffer()->_ref_decrement();
+        _set_uninitialized(other);
+    }
+    return *this;
+}
+
 string& string::assign(size_type size, char c)
 {
     if (size == 0)
@@ -54,6 +64,27 @@ string& string::assign(const char* str, size_type size)
     {
         _get_buffer()->_size = size;
         memcpy(_bytes, str, size);
+    }
+    return *this;
+}
+
+string& string::assign(const string& str, size_type pos, size_type count)
+{
+    SSTL_ASSERT(str.size() >= pos);
+    if (pos == 0 && count >= size()) // easy and efficient, no copying
+        assign(str);                 //   will work even if this == &str
+    else
+    {
+        const size_type max_count = str.size() - pos;
+        if (count > max_count)
+            count = max_count;
+        if (this == &str) // cannot do an assign because const iterators will not work in this case
+        {
+            erase(pos + count, str.size() - (pos + count));
+            erase(0, pos);
+        }
+        else
+            assign(str.data() + pos, count);
     }
     return *this;
 }
@@ -145,15 +176,25 @@ void string::resize(size_type new_size)
 
 string& string::erase(size_type pos, size_type count)
 {
-    SSTL_ASSERT(pos + count <= size());
     if (count != 0)
     {
+        SSTL_ASSERT(pos < size()); // otherwise pos can be anything
         unshare();
+        const size_type delta = count - pos;
+        if (delta < count)
+            count = delta;
         const size_type end_pos = pos + count;
         memmove(_bytes + pos, _bytes + end_pos, size() - end_pos);
         _get_buffer()->_size -= count;
     }
     return *this;
+}
+
+string string::substr(size_type pos, size_type count)
+{
+    string result;
+    result.assign(*this, pos, count);  // this will take care of all caveats
+    return result;
 }
 
 void string::clear()

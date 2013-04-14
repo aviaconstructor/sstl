@@ -36,12 +36,14 @@ TEST(test_string, types)
 
 TEST(test_string, constructors)
 {
+    static const char aaa [] = "AAAAAAAAAAAAAAAA";
     string s1 = "AAAAAAAAAAAAAAAA";
-    string s2("AAAAAAAAAAAAAAAA");
-    string s3("AAAAAAAAAAAAAAAA", 16);
+    string s2(aaa);
+    string s3(aaa, 16);
     string s4(16, 'A');
     string s5(s1);
     string s6(s1, 0, 16);
+
     ASSERT_EQ(s1, s2);
     ASSERT_EQ(s1, s3);
     ASSERT_EQ(s1, s4);
@@ -56,6 +58,9 @@ TEST(test_string, constructors)
 
     string s9(string("012345678901234567890123456789"), 2);
     ASSERT_EQ(string("2345678901234567890123456789"), s9);
+
+    string s10(aaa, aaa + 16);
+    ASSERT_EQ(s1, s10);
 }
 
 TEST(test_string, assign)
@@ -69,6 +74,7 @@ TEST(test_string, assign)
     string s7;
     string s8;
     string s9(10000, 'q');
+    string s10("dummy");
 
     s2 = s1;
     s3.assign(s2);
@@ -78,6 +84,7 @@ TEST(test_string, assign)
     s7.assign(s6, 0, s6.size());
     s8.assign(s7, 0, 1000); // will be truncated to size()
     s9.assign(s8, 0, string::npos);
+    s10.assign(s2.begin(), s2.end());
 
     ASSERT_EQ(s1, s2);
     ASSERT_EQ(s1, s3);
@@ -87,6 +94,7 @@ TEST(test_string, assign)
     ASSERT_EQ(s1, s7);
     ASSERT_EQ(s1, s8);
     ASSERT_EQ(s1, s9);
+    ASSERT_EQ(s1, s10);
 }
 
 TEST(test_string, clear)

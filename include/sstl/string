@@ -9,6 +9,16 @@
 
 namespace SSTL_NAMESPACE {
 
+/// Standard string, not a typedef, not a template
+///
+/// \attention Incompatibilities with standard are numerous
+///    - While the standard assumes that string is a typedef of basic_string template,
+///      this implementation uses a class directly
+///    - The implementation uses reference counter (like GCC 3.x 4.x),
+///      which has numerous compatibility issues such as modifying
+///      a different string through an iterator
+///    - Calling c_str can invalidate constant iterators to string object
+///
 class string
 {
     friend class _intern_holder;
@@ -264,6 +274,8 @@ public:
 
     /// Access zero terminated string
     ///
+    /// \attention Calling c_str can invalidate constant iterators to string object
+    ///
     const char* c_str() const;
 
     string& operator=(char c)
@@ -300,24 +312,9 @@ public:
         return assign(static_cast<const char*>(&*begin), size);
     }
 
-    string& assign(const string& other)
-    {
-        if (this != &other) // otherwise the string might get deleted
-        {
-            _get_buffer()->_ref_decrement();
-            _set_uninitialized(other);
-        }
-        return *this;
-    }
+    string& assign(const string& other);
 
-    string& assign(const string& str, size_type pos, size_type count)
-    {
-        SSTL_ASSERT(str.size() >= pos);
-        const size_type max_count = str.size() - pos;
-        if (count > max_count)
-            count = max_count;
-        assign(str.data() + pos, count);
-    }
+    string& assign(const string& str, size_type pos, size_type count);
 
     string& operator+=(char c)
     {
@@ -370,6 +367,8 @@ public:
     }
 
     void resize(size_type new_size);
+
+    string substr(size_type pos = 0, size_type count = npos);
 
     void clear();
 
