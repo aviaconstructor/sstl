@@ -112,6 +112,45 @@ void swap(T& a, T& b)
     b = c;
 }
 
+
+// sstl::min, sstl::max
+
+// remove imcompatible C definitions
+#ifdef min
+    #undef min
+#endif
+#ifdef max
+    #undef max
+#endif
+
+template
+    <class T>
+const T& min(const T& a, const T& b)
+{
+    return (b < a) ? b : a;
+}
+
+template
+    <class T>
+const T& max(const T& a, const T& b)
+{
+    return (a < b) ? b : a;
+}
+
+template
+    <class T, class Comp>
+const T& min(const T& a, const T& b, Comp c)
+{
+    return c(b, a) ? b : a;
+}
+
+template
+    <class T, class Comp>
+const T& max(const T& a, const T& b, Comp c)
+{
+    return c(a, b) ? b : a;
+}
+
 } // namespace
 
 #endif

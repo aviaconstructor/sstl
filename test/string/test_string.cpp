@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
 
-//#define TEST_NATIVE_STL
-
 #if defined(SSTL_TEST_NATIVE_STL)
     #include <string>
     #include <iterator>
@@ -61,6 +59,9 @@ TEST(test_string, constructors)
 
     string s10(aaa, aaa + 16);
     ASSERT_EQ(s1, s10);
+
+    string s11(s9.rbegin(), s9.rend());
+    ASSERT_EQ(s11, "9876543210987654321098765432");
 }
 
 TEST(test_string, assign)
@@ -95,6 +96,11 @@ TEST(test_string, assign)
     ASSERT_EQ(s1, s8);
     ASSERT_EQ(s1, s9);
     ASSERT_EQ(s1, s10);
+
+    string s11 = "ABCDEFGH";
+    string s12;
+    s12.assign(s11.rbegin(), s11.rend());
+    ASSERT_EQ(s12, "HGFEDCBA");
 }
 
 TEST(test_string, clear)
@@ -153,7 +159,7 @@ static void _check_string_iterators(string s, string::size_type size, char front
 
     ASSERT_EQ(&(*s.rend()), &s[0] - 1);
 
-#if SSTL_CXX11
+#if SSTL_CXX11 != 0 || defined(_SSTL__STRING_INCLUDED) // if we test sstl, or if this is a C++11 compliant STL
     ASSERT_EQ(&(*s.cbegin()), &s[0]);
     ASSERT_EQ(*s.cbegin(), front);
 
@@ -267,7 +273,7 @@ TEST(test_string, reserve_resize)
     ASSERT_EQ(string("\0", 1), s2); // this verifies size also
 }
 
-#if defined(SSTL_CXX11) && SSTL_CXX11 != 0
+#if SSTL_CXX11 != 0 || defined(_SSTL__STRING_INCLUDED) // if we test sstl, or if this is a C++11 compliant STL
 TEST(test_string, shrink_to_fit)
 {
     string s(1551, '#');
@@ -284,6 +290,66 @@ TEST(test_string, shrink_to_fit)
     s.shrink_to_fit();
     ASSERT_GT(saved_capacity, s.capacity()); // capacity should become smaller
     ASSERT_GE(64, s.capacity());             // somewhat much smaller
+}
+#endif
+
+TEST(test_string, push_back)
+{
+    string s;
+    s.push_back('0');
+    s.push_back('1');
+    s.push_back('2');
+    s.push_back('3');
+    s.push_back('4');
+    s.push_back('5');
+    s.push_back('6');
+    s.push_back('7');
+    s.push_back('8');
+    s.push_back('9');
+    ASSERT_EQ(s, "0123456789");
+    s.push_back('A');
+    s.push_back('B');
+    s.push_back('C');
+    s.push_back('D');
+    s.push_back('E');
+    s.push_back('F');
+    s.push_back('G');
+    s.push_back('H');
+    s.push_back('I');
+    s.push_back('J');
+    s.push_back('K');
+    s.push_back('L');
+    s.push_back('M');
+    s.push_back('N');
+    ASSERT_EQ(s, "0123456789ABCDEFGHIJKLMN");
+}
+
+#if SSTL_CXX11 != 0 || defined(_SSTL__STRING_INCLUDED) // if we test sstl, or if this is a C++11 compliant STL
+TEST(test_string, pop_back)
+{
+    string s = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    s.pop_back();
+    ASSERT_EQ(s, "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy");
+    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();
+    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();
+    ASSERT_EQ(s, "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmno");
+    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();
+    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();
+    ASSERT_EQ(s, "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcde");
+    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();
+    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();
+    ASSERT_EQ(s, "0123456789ABCDEFGHIJKLMNOPQRSTU");
+    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();
+    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();
+    ASSERT_EQ(s, "0123456789ABCDEFGHIJK");
+    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();
+    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();
+    ASSERT_EQ(s, "0123456789A");
+    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();
+    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();    s.pop_back();
+    ASSERT_EQ(s, "0");
+    s.pop_back();
+    ASSERT_EQ(s, "");
 }
 #endif
 
@@ -521,4 +587,152 @@ TEST(test_string, rfind_str)
     _check_rfind(s, sp, 7, 6);
     _check_rfind(s, sp, 8, 6);
     _check_rfind(s, sp, string::npos, 6);
+}
+
+static void _check_substr(const string& s, string::size_type pos, string::size_type count, const string& result)
+{
+    string ret1 = s.substr(pos, count);
+    ASSERT_EQ(ret1, result);
+
+    string ret2 = s.substr(pos);
+    ASSERT_EQ(ret2, string(s, pos));
+    ASSERT_EQ(ret2, string(s, pos, s.size() - pos));
+
+    string ret3 = s.substr();
+    ASSERT_EQ(ret3, s);
+}
+
+TEST(test_string, substr)
+{
+    _check_substr("", 0, 0, "");
+    _check_substr("", 0, 1, "");
+    _check_substr("", 0, string::npos, "");
+
+    _check_substr("1", 0, 0, "");
+    _check_substr("2", 0, 1, "2");
+    _check_substr("3", 0, string::npos, "3");
+
+    _check_substr("4", 1, 0, "");
+    _check_substr("5", 1, 1, "");
+    _check_substr("6", 1, string::npos, "");
+
+    _check_substr("ABC", 0, 3, "ABC");
+    _check_substr("DEF", 1, 5, "EF");
+    _check_substr("GHI", 2, 7, "I");
+
+    _check_substr("abc", 0, string::npos, "abc");
+    _check_substr("def", 1, 0, "");
+    _check_substr("ghi", 2, 0, "");
+
+    _check_substr(string("\0\1\2\3\4", 5), 1, 2, "\1\2");
+    _check_substr("0123456789abcdefghijk", 0, 0, "");
+    _check_substr("0123456789abcdefghijk", 20, 0, "");
+    _check_substr("0123456789abcdefghijk", 2, 5, "23456");
+
+    _check_substr("0123456789012345678901234567890123456789012345678901234567890123456789",
+            2, 50,  "23456789012345678901234567890123456789012345678901");
+}
+
+static void _check_append(const string& s, const string& what, const string& result)
+{
+    string res = s;
+    const string& ret_val = res.append(what);
+    ASSERT_EQ(res, result);
+    ASSERT_EQ(ret_val, result);
+
+    res = s;
+    res.append(what.c_str());
+    ASSERT_EQ(res, result);
+
+    res = s;
+    res.append(what.data(), what.size());
+    ASSERT_EQ(res, result);
+
+    res = s;
+    res.append(what.begin(), what.end());
+    ASSERT_EQ(res, result);
+
+    res = s;
+    res.append(what.begin(), what.end());
+    ASSERT_EQ(res, result);
+
+    res = s;
+    res.append(what.rbegin(), what.rend());
+    ASSERT_EQ(res, s + string(what.rbegin(), what.rend()));
+
+    if (what.size() == 1)
+    {
+        res = s;
+        res.append(1, what[0]);
+        ASSERT_EQ(res, result);
+    }
+}
+
+TEST(test_string, append)
+{
+    _check_append("", "", "");
+    _check_append("", "1", "1");
+    _check_append("2", "", "2");
+    _check_append("3", "4", "34");
+    _check_append("", "56", "56");
+    _check_append("78", "", "78");
+    _check_append("90", "AB", "90AB");
+    _check_append("012345678901234567890123456789012345678901234567890123456789",
+                  "ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ",
+                  "012345678901234567890123456789012345678901234567890123456789ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ");
+}
+
+static void _check_copy(const string& s, string::size_type count, string::size_type pos)
+{
+    char buff[256];
+    memset(buff, 0, sizeof(buff));
+
+    s.copy(buff, count, pos);
+    ASSERT_TRUE(memcmp(buff, s.data() + pos, s.size() - pos) == 0);
+    memset(buff, 0, sizeof(buff));
+
+    s.copy(buff, count);
+    ASSERT_TRUE(memcmp(buff, s.data(), s.size() - pos) == 0);
+    memset(buff, 0, sizeof(buff));
+
+    s.copy(buff, sizeof(buff));
+    ASSERT_TRUE(memcmp(buff, s.data(), s.size() - pos) == 0);
+    memset(buff, 0, sizeof(buff));
+
+    s.copy(buff, string::npos); // also legal, limits by s.size()
+    ASSERT_TRUE(memcmp(buff, s.data(), s.size() - pos) == 0);
+    memset(buff, 0, sizeof(buff));
+}
+
+TEST(test_string, copy)
+{
+    _check_copy("", 0, 0);
+    _check_copy("A", 1, 0);
+    _check_copy("B", 0, 1);
+    _check_copy("CDEFGH", 100, 0);
+    _check_copy("0123456789", string::npos, 5);
+}
+
+TEST(test_string, operators)
+{
+    string s1, s2, s3;
+    s1 = s2 + s3;
+    ASSERT_EQ(s1, "");
+    s1 = "a" + s3;
+    ASSERT_EQ(s1, "a");
+    s1 = s1 + s3;
+    ASSERT_EQ(s1, "a");
+    s1 = s1 + s1;
+    ASSERT_EQ(s1, "aa");
+    s1 = s1 + "b";
+    ASSERT_EQ(s1, "aab");
+    s1 = 'c' + s1;
+    ASSERT_EQ(s1, "caab");
+    s1 = s1 + 'd';
+    ASSERT_EQ(s1, "caabd");
+}
+
+TEST(test_string, sizeofs)
+{
+    printf("  sizeof(string) = %d\n", static_cast<int>(sizeof(string)));
 }

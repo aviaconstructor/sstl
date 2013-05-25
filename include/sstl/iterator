@@ -40,6 +40,10 @@ struct iterator_traits<const T*>
     typedef const T&   reference;
 };
 
+/// Reverse iterator.
+///
+/// All iterators in SSTL, including this reverse one, are bidirectional and random access
+///
 template
    <typename T>
 class reverse_iterator
@@ -66,7 +70,11 @@ public:
     T base() const { return (_iterator); }
 
     bool operator==(const reverse_iterator& p) const { return _iterator == p._iterator; }
+    bool operator!=(const reverse_iterator& p) const { return _iterator != p._iterator; }
     bool operator<(const reverse_iterator& p) const { return p._iterator < _iterator; }
+    bool operator>(const reverse_iterator& p) const { return p._iterator > _iterator; }
+    bool operator<=(const reverse_iterator& p) const { return p._iterator <= _iterator; }
+    bool operator>=(const reverse_iterator& p) const { return p._iterator >= _iterator; }
 
     reference                operator*() const { T prev(_iterator); --prev; return *prev; }
     pointer                  operator->() const { return &(operator*()); }
@@ -79,7 +87,7 @@ public:
     reverse_iterator         operator+(size_t n) const { return reverse_iterator<T>(_iterator - n); }
     reverse_iterator         operator-(size_t n) const { return reverse_iterator<T>(_iterator + n); }
     reference                operator[](int n) const { return *(*this + n); }
-    difference_type          operator- (const reverse_iterator& i) const { return distance(_iterator, i._iterator); }
+    difference_type          operator-(const reverse_iterator& i) const { return i._iterator - _iterator; }
 };
 
 } // namespace

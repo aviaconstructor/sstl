@@ -71,20 +71,14 @@ string& string::assign(const char* str, size_type size)
 string& string::assign(const string& str, size_type pos, size_type count)
 {
     SSTL_ASSERT(str.size() >= pos);
-    if (pos == 0 && count >= size()) // easy and efficient, no copying
-        assign(str);                 //   will work even if this == &str
+    if (this == &str)
+        *this = string(str, pos, count);
     else
     {
-        const size_type max_count = str.size() - pos;
-        if (count > max_count)
-            count = max_count;
-        if (this == &str) // cannot do an assign because const iterators will not work in this case
-        {
-            erase(pos + count, str.size() - (pos + count));
-            erase(0, pos);
-        }
-        else
-            assign(str.data() + pos, count);
+        const size_type delta = str.size() - pos;
+        if (count == npos || delta < count)
+            count = delta;
+        assign(str.data() + pos, count);
     }
     return *this;
 }
@@ -114,7 +108,7 @@ const char* string::c_str() const
 // Return the hash value for a zero terminated character string.
 //
 // The algorithm is loosely based on Jenkins one-at-a-time hash function.
-///
+//
 unsigned string::static_hash(const char* p, size_type size)
 {
     if (size == 0)
@@ -160,17 +154,14 @@ void string::resize(size_type new_size)
     size_type old_size = size();
     if (new_size != old_size)
     {
-        if (new_size < old_size) // shrink
-        {
-            unshare();
-            _get_buffer()->_size = new_size;
-        }
-        else // grow
+        if (is_shared() || new_size > old_size)
         {
             const size_type diff = new_size - old_size;
             char* buff = _append_uninitialized(diff);
             memset(buff, 0, diff);
         }
+        else      // shrink self without a hassle
+            _get_buffer()->_size = new_size;
     }
 }
 
@@ -178,23 +169,46 @@ string& string::erase(size_type pos, size_type count)
 {
     if (count != 0)
     {
-        SSTL_ASSERT(pos < size()); // otherwise pos can be anything
-        unshare();
-        const size_type delta = count - pos;
-        if (delta < count)
+        const size_type old_size = size();
+        SSTL_ASSERT(pos < old_size); // otherwise pos can be anything
+        const size_type delta = old_size - pos;
+        if (count == npos || count > delta)
             count = delta;
         const size_type end_pos = pos + count;
-        memmove(_bytes + pos, _bytes + end_pos, size() - end_pos);
-        _get_buffer()->_size -= count;
+        if (is_shared()) // have to reallocate anyway
+        {
+            const size_type new_size = old_size - count;
+            size_type new_capacity = _adjust_capacity(new_size);
+            _buffer_type* buff = _new_uninitialized_buffer(new_size, new_capacity);
+            memcpy(buff->_bytes, _bytes, pos);
+            memcpy(buff->_bytes + pos, _bytes + end_pos, old_size - end_pos);
+            _get_buffer()->_ref_decrement();
+            _bytes = buff->_bytes;
+        }
+        else
+        {
+            memmove(_bytes + pos, _bytes + end_pos, old_size - end_pos);
+            _get_buffer()->_size -= count;
+        }
     }
     return *this;
 }
 
-string string::substr(size_type pos, size_type count)
+string string::substr(size_type pos, size_type count) const
 {
     string result;
     result.assign(*this, pos, count);  // this will take care of all caveats
     return result;
+}
+
+string::size_type string::copy(char* dest, size_type count, size_type pos) const
+{
+    SSTL_ASSERT(pos <= size());
+    const size_type delta = size() - pos;
+    if (count == npos || count > delta)
+        count = delta;
+    memcpy(dest, _bytes + pos, count);
+    return count;
 }
 
 void string::clear()
@@ -263,6 +277,27 @@ bool string::operator==(const char* s) const
     if (len != size())
         return false;
     return memcmp(_bytes, s, len) == 0;
+}
+
+string string::operator+(char c) const
+{
+    return _op_plus_right(&c, 1);
+}
+string string::operator+(const char* s) const
+{
+    return _op_plus_right(s, strlen(s));
+}
+string string::operator+(const string& s) const
+{
+    return _op_plus_right(s.data(), s.size());
+}
+string operator+(char c, const string& s2)
+{
+    return s2._op_plus_left(&c, 1);
+}
+string operator+(const char* s1, const string& s2)
+{
+    return s2._op_plus_left(s1, strlen(s1));
 }
 
 string::size_type string::find(char ch, size_type pos) const
@@ -380,6 +415,7 @@ void string::_set_uninitialized(const string& other)
 string::_buffer_type* string::_new_uninitialized_buffer(size_type size, size_type capacity)
 {
     SSTL_ASSERT(size <= capacity);
+    SSTL_ASSERT(capacity != 0);
     SSTL_ASSERT(capacity >= _capacity_granularity);
     unsigned buffer_sizeof = _buffer_type_header_sizeof + capacity;
     _buffer_type* buff = reinterpret_cast<_buffer_type*>(new char[buffer_sizeof]);
@@ -418,9 +454,7 @@ char* string::_append_uninitialized(size_type count)
     SSTL_ASSERT(!is_interned()); // attempt to modify a readonly interned string is made
     size_type old_size = size();
     size_type new_size = old_size + count;
-    if (new_size < capacity()) // +1 for terminating zero
-        unshare();
-    else // grow
+    if (is_shared() || new_size > capacity())
     {
         char* bytes = _new_uninitialized(new_size);
         memcpy(bytes, _bytes, old_size);
@@ -441,12 +475,7 @@ char* string::_insert_uninitialized(size_type index, size_type count)
     SSTL_ASSERT(count != npos);
     size_type old_size = size();
     size_type new_size = old_size + count;
-    if (new_size < capacity()) // +1 for terminating zero
-    {
-        unshare();
-        memmove(_bytes + index + count, _bytes + index, old_size - index);
-    }
-    else // grow
+    if (is_shared() || new_size > capacity())
     {
         char* bytes = _new_uninitialized(new_size);
         memcpy(bytes, _bytes, index);
@@ -471,6 +500,24 @@ char* string::_replace_uninitialized(size_type pos, size_type count, size_type n
     else if (new_count > count) // grow
         _insert_uninitialized(pos + count, new_count - count);
     return _bytes + pos;
+}
+
+string string::_op_plus_right(const char* s, size_type len) const
+{
+    string result;
+    result.reserve(size() + len);
+    result.append(*this);
+    result.append(s, len);
+    return result;
+}
+
+string string::_op_plus_left(const char* s, size_type len) const
+{
+    string result;
+    result.reserve(size() + len);
+    result.append(s, len);
+    result.append(*this);
+    return result;
 }
 
 // Support for string interning

@@ -163,9 +163,16 @@ public:
         _set_uninitialized(size, c);
     }
 
-    /// Assign string from an iterator range
+    string(const_iterator begin, const_iterator end)
+    {
+        SSTL_ASSERT(end >= begin);
+        const size_type size = static_cast<size_type>(end - begin);
+        _set_uninitialized(begin, size);
+    }
+
+    /// Construct from generic iterator range
     ///
-    /// The current implementation supports only forward bidirectional iterators!
+    /// This constructor will be used for every iterator type but const_iterator
     ///
     template
         <class Iter>
@@ -173,7 +180,15 @@ public:
     {
         SSTL_ASSERT(end >= begin);
         const size_type size = static_cast<size_type>(end - begin);
-        _set_uninitialized(static_cast<const char*>(&*begin), size);
+        if (size == 0)
+            _clear_uninitizlized();
+        else
+        {
+            _bytes = _new_uninitialized(size);
+            char* b = _bytes;
+            for ( ; begin != end; ++begin, ++b )
+                *b = *begin;
+        }
     }
 
     string(const string& other)
@@ -299,6 +314,13 @@ public:
 
     string& assign(const char* str, size_type size);
 
+    string& assign(const_iterator begin, const_iterator end)
+    {
+        SSTL_ASSERT(end >= begin);
+        const size_type size = static_cast<size_type>(end - begin);
+        return assign(begin, size);
+    }
+
     /// Assign string from an iterator range
     ///
     /// The current implementation supports only forward bidirectional iterators!
@@ -308,8 +330,18 @@ public:
     string& assign(Iter begin, Iter end)
     {
         SSTL_ASSERT(end >= begin);
+        _get_buffer()->_ref_decrement();
         const size_type size = static_cast<size_type>(end - begin);
-        return assign(static_cast<const char*>(&*begin), size);
+        if (size == 0)
+            _clear_uninitizlized();
+        else
+        {
+            _bytes = _new_uninitialized(size);
+            char* buff = _bytes;
+            for ( ; begin != end; ++begin, ++buff)
+                *buff = *begin;
+        }
+        return *this;
     }
 
     string& assign(const string& other);
@@ -336,6 +368,16 @@ public:
         char* place = _append_uninitialized(1);
         *place = c;
         return *this;
+    }
+
+    /// Removes the last character
+    ///
+    /// \since C++11
+    ///
+    void pop_back()
+    {
+        SSTL_ASSERT(!empty());
+        _get_buffer()->_size--;
     }
 
     string& append(size_type size, char c)
@@ -366,11 +408,35 @@ public:
         return append(other.data(), other.size());
     }
 
+    string& append(const_iterator begin, const_iterator end)
+    {
+        SSTL_ASSERT(begin <= end);
+        const size_type size = static_cast<size_type>(end - begin);
+        return append(begin, size);
+    }
+
+    template
+        <class Iter>
+    string& append(Iter begin, Iter end)
+    {
+        SSTL_ASSERT(begin <= end);
+        const size_type size = static_cast<size_type>(end - begin);
+        if (size > 0)
+        {
+            char* buff = _append_uninitialized(size);
+            for ( ; begin != end; ++begin, ++buff)
+                *buff = *begin;
+        }
+        return *this;
+    }
+
     void resize(size_type new_size);
 
-    string substr(size_type pos = 0, size_type count = npos);
+    string substr(size_type pos = 0, size_type count = npos) const;
 
     void clear();
+
+    size_type copy(char* dest, size_type count, size_type pos = 0) const;
 
     static unsigned static_hash(const char* p, size_type size);
 
@@ -449,6 +515,16 @@ public:
         return insert(pos, str.data() + strPos, strCount);
     }
 
+    iterator insert(const_iterator where, const_iterator inputFirst, const_iterator inputLast)
+    {
+        SSTL_ASSERT(inputFirst <= inputLast);
+        SSTL_ASSERT(where >= _bytes && where <= _bytes + size());
+        size_type pos = where - _bytes;
+        size_type count = inputLast - inputFirst;
+        insert(pos, inputFirst, count);
+        return begin() + pos + count;
+    }
+
     template
         <class InputIt>
     iterator insert(const_iterator where, InputIt inputFirst, InputIt inputLast)
@@ -457,10 +533,14 @@ public:
         SSTL_ASSERT(where >= _bytes && where <= _bytes + size());
         size_type pos = where - _bytes;
         size_type count = inputLast - inputFirst;
-        char* buff = _insert_uninitialized(pos, count);
-        for ( ; inputFirst != inputLast; ++inputFirst, ++buff )
-            buff = *inputFirst;
-        return buff;
+        if (count == 0)
+            return where;
+        {
+            char* buff = _insert_uninitialized(pos, count);
+            for ( ; inputFirst != inputLast; ++inputFirst, ++buff )
+                buff = *inputFirst;
+            return buff;
+        }
     }
 
     string& replace(size_type pos, size_type count, const string& str)
@@ -484,22 +564,6 @@ public:
         SSTL_ASSERT(strPos <= str.size());
         SSTL_ASSERT(strPos + strCount <= str.size());
         return replace(pos, count, str.data() + strPos, strCount);
-    }
-
-    template
-        <class InputIt>
-    string& replace(const_iterator first, const_iterator last, InputIt inputFirst, InputIt inputLast)
-    {
-        SSTL_ASSERT(first >= _bytes);
-        SSTL_ASSERT(last <= _bytes + size());
-        SSTL_ASSERT(inputFirst <= inputLast);
-        size_type pos = first - _bytes;
-        size_type count = last - first;
-        size_type newCount = inputLast - inputFirst;
-        char* buff = _replace_uninitialized(pos, count, newCount);
-        for ( ; inputFirst != inputLast; ++inputFirst, ++buff )
-            *buff = *inputFirst;
-        return *this;
     }
 
     string& replace(size_type pos, size_type count, const char* s, size_type sCount)
@@ -552,6 +616,33 @@ public:
         size_type pos = static_cast<size_type>(first - _bytes);
         size_type count = static_cast<size_type>(last - first);
         return replace(pos, count, cCount, c);
+    }
+
+    string& replace(const_iterator first, const_iterator last, const_iterator inputFirst, const_iterator inputLast)
+    {
+        SSTL_ASSERT(first >= _bytes);
+        SSTL_ASSERT(last <= _bytes + size());
+        SSTL_ASSERT(inputFirst <= inputLast);
+        size_type pos = first - _bytes;
+        size_type count = last - first;
+        size_type strCount = inputLast - inputFirst;
+        return replace(pos, count, inputFirst, strCount);
+    }
+
+    template
+        <class InputIt>
+    string& replace(const_iterator first, const_iterator last, InputIt inputFirst, InputIt inputLast)
+    {
+        SSTL_ASSERT(first >= _bytes);
+        SSTL_ASSERT(last <= _bytes + size());
+        SSTL_ASSERT(inputFirst <= inputLast);
+        size_type pos = first - _bytes;
+        size_type count = last - first;
+        size_type newCount = inputLast - inputFirst;
+        char* buff = _replace_uninitialized(pos, count, newCount);
+        for ( ; inputFirst != inputLast; ++inputFirst, ++buff )
+            *buff = *inputFirst;
+        return *this;
     }
 
     int compare(const string& str) const;
@@ -624,6 +715,12 @@ public:
     {
         return s2.compare(s1) < 0;
     }
+
+    string operator+(char c) const;
+    string operator+(const char* s) const;
+    string operator+(const string& s) const;
+    friend string operator+(char c, const string& s2);
+    friend string operator+(const char* s1, const string& s2);
 
     /// Nonconstant indexing operator only assumes immediate assignmnet, no reference shall be stored to assign later
     ///
@@ -702,7 +799,7 @@ private:
 
     void _set_uninitialized(char c)
     {
-        _bytes = _new_uninitialized(1);
+        ;
         _bytes[0] = c;
     }
 
@@ -725,6 +822,9 @@ private:
     static _buffer_type* _new_uninitialized_buffer(size_type size, size_type capacity);
 
     static char* _new_uninitialized(size_type size);
+
+    string _op_plus_right(const char* s, size_type len) const;
+    string _op_plus_left(const char* s, size_type len) const;
 
 public:
 
