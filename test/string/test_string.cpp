@@ -27,7 +27,7 @@ TEST(test_string, types)
     SSTL_STATIC_ASSERT(typeid(char*) == typeid(string::pointer), "pointer type uis bad");
     SSTL_STATIC_ASSERT(typeid(const char*) == typeid(string::const_pointer), "const pointer type is bad");
 
-#if !defined(SSTL_TEST_NATIVE_STL)
+#if defined(_SSTL__STRING_INCLUDED)
     ASSERT_EQ(32, sizeof(string::_buffer_type));
 #endif
 }
@@ -62,6 +62,31 @@ TEST(test_string, constructors)
 
     string s11(s9.rbegin(), s9.rend());
     ASSERT_EQ(s11, "9876543210987654321098765432");
+
+    string s12 = s11;
+    ASSERT_EQ(s12, "9876543210987654321098765432");
+#if defined(_SSTL__STRING_INCLUDED)
+    ASSERT_TRUE(s12.is_shared());
+    ASSERT_TRUE(s11.is_shared());
+#endif
+
+    string s13(s12.begin(), s12.end());
+    ASSERT_EQ(s13, s12);
+
+#if SSTL_CXX11 != 0 || defined(_SSTL__STRING_INCLUDED) // if we test sstl, or if this is a C++11 compliant STL
+    string s14(s11.cbegin(), s11.cend());
+    ASSERT_EQ(s14, s11);
+
+    string s15(s9.crbegin(), s9.crend());
+    ASSERT_EQ(s15, s11); // reverse
+#endif
+
+    // collect constructed shared strings
+    string s16(s13);
+    string s17 = s13;
+    string s18(s16);
+    string s19(s13);
+    string s20 = s13;
 }
 
 TEST(test_string, assign)
@@ -101,6 +126,30 @@ TEST(test_string, assign)
     string s12;
     s12.assign(s11.rbegin(), s11.rend());
     ASSERT_EQ(s12, "HGFEDCBA");
+
+    // now change the original s1, unshare in SSTL
+    s1.assign("00000");
+    ASSERT_EQ(s3, s2); // these should stay
+    s2 = s1;
+    s3.assign(s2);
+    s4.assign(s1.c_str());
+    s5.assign(s4.data(), s4.size());
+    s6.assign(s4.size(), '0');
+    s7.assign(s6, 0, s6.size());
+    s8.assign(s7, 0, 1000); // will be truncated to size()
+    s9.assign(s8, 0, string::npos);
+    s10.assign(s2.begin(), s2.end());
+
+    ASSERT_EQ(s1, "00000");
+    ASSERT_EQ(s1, s2);
+    ASSERT_EQ(s1, s3);
+    ASSERT_EQ(s1, s4);
+    ASSERT_EQ(s1, s5);
+    ASSERT_EQ(s1, s6);
+    ASSERT_EQ(s1, s7);
+    ASSERT_EQ(s1, s8);
+    ASSERT_EQ(s1, s9);
+    ASSERT_EQ(s1, s10);
 }
 
 TEST(test_string, clear)
@@ -295,33 +344,19 @@ TEST(test_string, shrink_to_fit)
 
 TEST(test_string, push_back)
 {
+    // make sure the amount if pushbacks is big enough to cause reallocation
     string s;
-    s.push_back('0');
-    s.push_back('1');
-    s.push_back('2');
-    s.push_back('3');
-    s.push_back('4');
-    s.push_back('5');
-    s.push_back('6');
-    s.push_back('7');
-    s.push_back('8');
-    s.push_back('9');
+    s.push_back('0');    s.push_back('1');    s.push_back('2');    s.push_back('3');    s.push_back('4');
+    s.push_back('5');    s.push_back('6');    s.push_back('7');    s.push_back('8');    s.push_back('9');
     ASSERT_EQ(s, "0123456789");
-    s.push_back('A');
-    s.push_back('B');
-    s.push_back('C');
-    s.push_back('D');
-    s.push_back('E');
-    s.push_back('F');
-    s.push_back('G');
-    s.push_back('H');
-    s.push_back('I');
-    s.push_back('J');
-    s.push_back('K');
-    s.push_back('L');
-    s.push_back('M');
-    s.push_back('N');
-    ASSERT_EQ(s, "0123456789ABCDEFGHIJKLMN");
+    s.push_back('A');    s.push_back('B');    s.push_back('C');    s.push_back('D');    s.push_back('E');
+    s.push_back('F');    s.push_back('G');    s.push_back('H');    s.push_back('I');    s.push_back('J');
+    s.push_back('K');    s.push_back('L');    s.push_back('M');    s.push_back('N');    s.push_back('O');
+    ASSERT_EQ(s, "0123456789ABCDEFGHIJKLMNO");
+    s.push_back('a');    s.push_back('b');    s.push_back('c');    s.push_back('d');    s.push_back('e');
+    s.push_back('f');    s.push_back('g');    s.push_back('h');    s.push_back('i');    s.push_back('j');
+    s.push_back('k');    s.push_back('l');    s.push_back('m');    s.push_back('n');    s.push_back('o');
+    ASSERT_EQ(s, "0123456789ABCDEFGHIJKLMNOabcdefghijklmno");
 }
 
 #if SSTL_CXX11 != 0 || defined(_SSTL__STRING_INCLUDED) // if we test sstl, or if this is a C++11 compliant STL
@@ -370,6 +405,22 @@ static void _check_find(const string& s, char c, string::size_type pos, string::
     string::size_type result3 = s.find(&c, pos, 1);
     ASSERT_EQ(result3, expected);
 
+    string ss = s; // test on shared string (SSTL specific)
+    string::size_type result_s = ss.find(c, pos);
+    ASSERT_EQ(result_s, expected);
+    if (expected != string::npos)
+    {
+        ASSERT_LE(pos, expected);
+        ASSERT_LE(expected + 1, ss.size());
+    }
+    if (pos == 0)
+    {
+        string::size_type result_s2 = ss.find(c);
+        ASSERT_EQ(result_s2, expected);
+    }
+    string::size_type result_s3 = ss.find(&c, pos, 1);
+    ASSERT_EQ(result_s3, expected);
+
     if (c != '\0')
     {
         char sc[2];
@@ -377,6 +428,8 @@ static void _check_find(const string& s, char c, string::size_type pos, string::
         sc[1] = '\0';
         string::size_type result4 = s.find(sc, pos);
         ASSERT_EQ(result4, expected);
+        string::size_type result5 = ss.find(sc, pos);
+        ASSERT_EQ(result5, expected);
     }
 }
 
@@ -670,6 +723,31 @@ static void _check_append(const string& s, const string& what, const string& res
 
 TEST(test_string, append)
 {
+    string s0;
+    const string& ret_val0 = s0.append("");
+    ASSERT_EQ(s0, "");
+    ASSERT_EQ(s0, ret_val0);
+
+    string s1 = "";
+    const string& ret_val1 = s1.append("abcde");
+    ASSERT_EQ(s1, "abcde");
+    ASSERT_EQ(s1, ret_val1);
+
+    string s2 = "abc";
+    const string& ret_val2 = s2.append("abcde");
+    ASSERT_EQ(s2, "abcabcde");
+    ASSERT_EQ(s2, ret_val2);
+
+    string s3;
+    const string& ret_val3 = s3.append(70, '0');
+    ASSERT_EQ(s3, "0000000000000000000000000000000000000000000000000000000000000000000000");
+    ASSERT_EQ(s3, ret_val3);
+
+    string s4 = "01234567890123456789012345678901234567890123456789";
+    const string& ret_val4 = s4.append(50, 'z');
+    ASSERT_EQ(s4, "01234567890123456789012345678901234567890123456789zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz");
+    ASSERT_EQ(s4, ret_val4);
+
     _check_append("", "", "");
     _check_append("", "1", "1");
     _check_append("2", "", "2");
@@ -713,7 +791,7 @@ TEST(test_string, copy)
     _check_copy("0123456789", string::npos, 5);
 }
 
-TEST(test_string, operators)
+TEST(test_string, operator_plus)
 {
     string s1, s2, s3;
     s1 = s2 + s3;
@@ -730,6 +808,45 @@ TEST(test_string, operators)
     ASSERT_EQ(s1, "caab");
     s1 = s1 + 'd';
     ASSERT_EQ(s1, "caabd");
+    s1 = "1" + s1 + 'z';
+    ASSERT_EQ(s1, "1caabdz");
+    s1 = s1 + s1 + s1;
+    ASSERT_EQ(s1, "1caabdz1caabdz1caabdz");
+    s1 = s1.c_str() + s1 + s1.c_str();
+    ASSERT_EQ(s1, "1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz");
+
+    s2 = s1;
+    s3 = s1 + s2;
+    ASSERT_EQ(s3, "1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz");
+
+    s2 = "%";
+    s3.assign(5, '*');
+    s1 = s2 + s3 + s1 + s3 + s2;
+    ASSERT_EQ(s1, "%*****1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz1caabdz*****%");
+
+    s2.clear();
+    s1 = s2 + 'a' + 'b' + 'c' + 'd' + 'e' + 'f' + 'g' + 'h' + 'i' + 'j' + 'k' + 'l' + 'm' + 'n' + 'o' + 'p' + 'q';
+    ASSERT_EQ(s1, "abcdefghijklmnopq");
+    s1 = s1 + "A" + "B" + "C" + "D" + "E" + "F" + "G" + "H" + "I" + "J" + "K" + "L" + "M" + "N" + "O" + "P" + "Q";
+    ASSERT_EQ(s1, "abcdefghijklmnopqABCDEFGHIJKLMNOPQ");
+    s1 = s1 + "0" + "1" + "2" + '3' + '4' + "5" + "6" + '7' + "8" + "9";
+    ASSERT_EQ(s1, "abcdefghijklmnopqABCDEFGHIJKLMNOPQ0123456789");
+}
+
+TEST(test_string, operator_plus_equal)
+{
+    s1 += '+';
+    s1 += '-';
+    s1 += "()";
+    s1 += "[(=)]";
+    s1 += '|';
+    s1 += "{}";
+    ASSERT_EQ(s1, "abcdefghijklmnopqABCDEFGHIJKLMNOPQ0123456789+-()[(=)]|{}");
+    s1 += '1';    s1 += '2';    s1 += '3';    s1 += '4';    s1 += '5';
+    s1 += '6';    s1 += '7';    s1 += '8';    s1 += '9';    s1 += '0';
+    s1 += "1";    s1 += "2";    s1 += "3";    s1 += "4";    s1 += "5";
+    s1 += "6";    s1 += "7";    s1 += "8";    s1 += "9";    s1 += "0";
+    ASSERT_EQ(s1, "abcdefghijklmnopqABCDEFGHIJKLMNOPQ0123456789+-()[(=)]|{}12345678901234567890");
 }
 
 TEST(test_string, sizeofs)

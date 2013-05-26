@@ -170,6 +170,13 @@ public:
         _set_uninitialized(begin, size);
     }
 
+    string(iterator begin, iterator end)
+    {
+        SSTL_ASSERT(end >= begin);
+        const size_type size = static_cast<size_type>(end - begin);
+        _set_uninitialized(begin, size);
+    }
+
     /// Construct from generic iterator range
     ///
     /// This constructor will be used for every iterator type but const_iterator
@@ -297,33 +304,29 @@ public:
     {
         return assign(1, c);
     }
-
     string& operator=(const char* str)
     {
         return assign(str);
     }
-
     string& operator=(const string& other)
     {
         return assign(other);
     }
 
     string& assign(size_type size, char c);
-
     string& assign(const char* str);
-
     string& assign(const char* str, size_type size);
-
-    string& assign(const_iterator begin, const_iterator end)
+    string& assign(const_iterator begin, const_iterator end);
+    string& assign(iterator begin, iterator end)
     {
-        SSTL_ASSERT(end >= begin);
-        const size_type size = static_cast<size_type>(end - begin);
-        return assign(begin, size);
+        return assign(const_cast<const_iterator>(begin), const_cast<const_iterator>(end));
     }
 
-    /// Assign string from an iterator range
+    /// Assign string from a generic iterator range
     ///
-    /// The current implementation supports only forward bidirectional iterators!
+    /// This method is selected by the compiler for reverse iterators and so on,
+    /// while for everything else such as const_iterator and iterator there are
+    /// more efficient implementations with explicit parameeters.
     ///
     template
         <class Iter>
@@ -363,12 +366,7 @@ public:
         return append(s);
     }
 
-    string& push_back(char c)
-    {
-        char* place = _append_uninitialized(1);
-        *place = c;
-        return *this;
-    }
+    string& push_back(char c);
 
     /// Removes the last character
     ///
@@ -380,39 +378,14 @@ public:
         _get_buffer()->_size--;
     }
 
-    string& append(size_type size, char c)
+    string& append(size_type size, char c);
+    string& append(const char* str);
+    string& append(const char* str, size_type size);
+    string& append(const string& other);
+    string& append(const_iterator begin, const_iterator end);
+    string& append(iterator begin, iterator end)
     {
-        char* place = _append_uninitialized(size);
-        memset(place, c, size);
-        return *this;
-    }
-
-    string& append(const char* str)
-    {
-        const size_type len = static_cast<size_type>(strlen(str));
-        return append(str, len);
-    }
-
-    string& append(const char* str, size_type size)
-    {
-        if (size != 0)
-        {
-            char* place = _append_uninitialized(size);
-            memcpy(place, str, size);
-        }
-        return *this;
-    }
-
-    string& append(const string& other)
-    {
-        return append(other.data(), other.size());
-    }
-
-    string& append(const_iterator begin, const_iterator end)
-    {
-        SSTL_ASSERT(begin <= end);
-        const size_type size = static_cast<size_type>(end - begin);
-        return append(begin, size);
+        return append(const_cast<const_iterator>(begin), const_cast<const_iterator>(end));
     }
 
     template
@@ -446,202 +419,60 @@ public:
     }
 
     string& erase(size_type pos, size_type count);
+    iterator erase(const_iterator position);
+    iterator erase(const_iterator first, const_iterator last);
 
-    iterator erase(const_iterator position)
-    {
-        size_type index = static_cast<size_type>(position - _bytes);
-        SSTL_ASSERT(index < size());
-        erase(index, 1);
-        return _bytes + index;
-    }
-
-    iterator erase(const_iterator first, const_iterator last)
-    {
-        SSTL_ASSERT(_bytes >= first);
-        SSTL_ASSERT(last <= _bytes + size());
-        SSTL_ASSERT(first < last);
-        size_type pos = static_cast<size_type>(first - _bytes);
-        size_type count = static_cast<size_type>(last - first);
-        erase(pos, count);
-        return _bytes + pos;
-    }
-
-    iterator insert(const_iterator where, char ch)
-    {
-        size_type pos = static_cast<size_type>(where - _bytes);
-        SSTL_ASSERT(pos <= size());
-        char* buff = _insert_uninitialized(pos, 1);
-        buff[0] = ch;
-        return buff + 1;
-    }
-
-    iterator insert(const_iterator where, size_type count, char c)
-    {
-        size_type pos = static_cast<size_type>(where - _bytes);
-        insert(pos, count, c);
-        return _bytes + pos + count;
-    }
-
-    string& insert(size_type pos, size_type count, char c)
-    {
-        SSTL_ASSERT(pos <= size());
-        char* buff = _insert_uninitialized(pos, count);
-        memset(buff, c, count);
-        return *this;
-    }
-
-    string& insert(size_type pos, const char* s)
-    {
-        size_type size = static_cast<size_type>(strlen(s));
-        return insert(pos, s, size);
-    }
-
-    string& insert(size_type pos, const char* s, size_type count)
-    {
-        SSTL_ASSERT(pos <= size());
-        char* buff = _insert_uninitialized(pos, count);
-        memcpy(buff, s, count);
-        return *this;
-    }
-
-    string& insert(size_type pos, const string& str)
-    {
-        return insert(pos, str.data(), str.size());
-    }
-
-    string& insert(size_type pos, const string& str, size_type strPos, size_type strCount)
-    {
-        SSTL_ASSERT(strPos + strCount < str.size());
-        return insert(pos, str.data() + strPos, strCount);
-    }
-
-    iterator insert(const_iterator where, const_iterator inputFirst, const_iterator inputLast)
-    {
-        SSTL_ASSERT(inputFirst <= inputLast);
-        SSTL_ASSERT(where >= _bytes && where <= _bytes + size());
-        size_type pos = where - _bytes;
-        size_type count = inputLast - inputFirst;
-        insert(pos, inputFirst, count);
-        return begin() + pos + count;
-    }
+    iterator insert(const_iterator where, char ch);
+    iterator insert(const_iterator where, size_type count, char c);
+    string& insert(size_type pos, size_type count, char c);
+    string& insert(size_type pos, const char* s);
+    string& insert(size_type pos, const char* s, size_type count);
+    string& insert(size_type pos, const string& str);
+    string& insert(size_type pos, const string& str, size_type str_pos, size_type str_count);
+    iterator insert(const_iterator where, const_iterator input_first, const_iterator input_last);
 
     template
         <class InputIt>
-    iterator insert(const_iterator where, InputIt inputFirst, InputIt inputLast)
+    iterator insert(const_iterator where, InputIt input_first, InputIt input_last)
     {
-        SSTL_ASSERT(inputFirst <= inputLast);
+        SSTL_ASSERT(input_first <= input_last);
         SSTL_ASSERT(where >= _bytes && where <= _bytes + size());
         size_type pos = where - _bytes;
-        size_type count = inputLast - inputFirst;
+        size_type count = input_last - input_first;
         if (count == 0)
             return where;
         {
             char* buff = _insert_uninitialized(pos, count);
-            for ( ; inputFirst != inputLast; ++inputFirst, ++buff )
-                buff = *inputFirst;
+            for ( ; input_first != input_last; ++input_first, ++buff )
+                buff = *input_first;
             return buff;
         }
     }
 
-    string& replace(size_type pos, size_type count, const string& str)
-    {
-        char* buff = _replace_uninitialized(pos, count, str.size());
-        memcpy(buff, str.data(), str.size());
-        return *this;
-    }
-
-    string& replace(const_iterator first, const_iterator last, const string& str)
-    {
-        SSTL_ASSERT(first >= _bytes);
-        SSTL_ASSERT(last <= _bytes + size());
-        size_type pos = static_cast<unsigned>(first - _bytes);
-        size_type count = static_cast<unsigned>(last - first);
-        return replace(pos, count, str);
-    }
-
-    string& replace(size_type pos, size_type count, const string& str, size_type strPos, size_type strCount)
-    {
-        SSTL_ASSERT(strPos <= str.size());
-        SSTL_ASSERT(strPos + strCount <= str.size());
-        return replace(pos, count, str.data() + strPos, strCount);
-    }
-
-    string& replace(size_type pos, size_type count, const char* s, size_type sCount)
-    {
-        char* buff = _replace_uninitialized(pos, count, sCount);
-        memcpy(buff, s, sCount);
-        return *this;
-    }
-
-    string& replace(const_iterator first, const_iterator last, const char* s, size_type strCount)
-    {
-        SSTL_ASSERT(first >= _bytes);
-        SSTL_ASSERT(last <= _bytes + size());
-        SSTL_ASSERT(first <= last);
-        size_type pos = static_cast<unsigned>(first - _bytes);
-        size_type count = static_cast<unsigned>(last - first);
-        return replace(pos, count, s, strCount);
-    }
-
-    string& replace(size_type pos, size_type count, const char* s)
-    {
-        size_type sCount = static_cast<size_type>(strlen(s));
-        return replace(pos, count, s, sCount);
-    }
-
-    string& replace(const_iterator first, const_iterator last, const char* s)
-    {
-        SSTL_ASSERT(first >= _bytes);
-        SSTL_ASSERT(last <= _bytes + size());
-        SSTL_ASSERT(first <= last);
-        size_type pos = static_cast<size_type>(first - _bytes);
-        size_type count = static_cast<size_type>(last - first);
-        return replace(pos, count, s);
-    }
-
-    string& replace(size_type pos, size_type count, size_type cCount, char c)
-    {
-        char* buff = _replace_uninitialized(pos, count, cCount);
-        char* buffEnd = buff + cCount;
-        for ( ; buff != buffEnd; ++buff )
-            *buff = c;
-        return *this;
-    }
-
-    string& replace(const_iterator first, const_iterator last, size_type cCount, char c)
-    {
-        SSTL_ASSERT(first >= _bytes);
-        SSTL_ASSERT(last <= _bytes + size());
-        SSTL_ASSERT(first <= last);
-        size_type pos = static_cast<size_type>(first - _bytes);
-        size_type count = static_cast<size_type>(last - first);
-        return replace(pos, count, cCount, c);
-    }
-
-    string& replace(const_iterator first, const_iterator last, const_iterator inputFirst, const_iterator inputLast)
-    {
-        SSTL_ASSERT(first >= _bytes);
-        SSTL_ASSERT(last <= _bytes + size());
-        SSTL_ASSERT(inputFirst <= inputLast);
-        size_type pos = first - _bytes;
-        size_type count = last - first;
-        size_type strCount = inputLast - inputFirst;
-        return replace(pos, count, inputFirst, strCount);
-    }
+    string& replace(size_type pos, size_type count, const string& str);
+    string& replace(const_iterator first, const_iterator last, const string& str);
+    string& replace(size_type pos, size_type count, const string& str, size_type strPos, size_type strCount);
+    string& replace(size_type pos, size_type count, const char* s, size_type sCount);
+    string& replace(const_iterator first, const_iterator last, const char* s, size_type strCount);
+    string& replace(size_type pos, size_type count, const char* s);
+    string& replace(const_iterator first, const_iterator last, const char* s);
+    string& replace(size_type pos, size_type count, size_type c_count, char c);
+    string& replace(const_iterator first, const_iterator last, size_type cCount, char c);
+    string& replace(const_iterator first, const_iterator last, const_iterator input_first, const_iterator input_last);
 
     template
         <class InputIt>
-    string& replace(const_iterator first, const_iterator last, InputIt inputFirst, InputIt inputLast)
+    string& replace(const_iterator first, const_iterator last, InputIt input_first, InputIt input_last)
     {
         SSTL_ASSERT(first >= _bytes);
         SSTL_ASSERT(last <= _bytes + size());
-        SSTL_ASSERT(inputFirst <= inputLast);
+        SSTL_ASSERT(input_first <= input_last);
         size_type pos = first - _bytes;
         size_type count = last - first;
-        size_type newCount = inputLast - inputFirst;
+        size_type newCount = input_last - input_first;
         char* buff = _replace_uninitialized(pos, count, newCount);
-        for ( ; inputFirst != inputLast; ++inputFirst, ++buff )
-            *buff = *inputFirst;
+        for ( ; input_first != input_last; ++input_first, ++buff )
+            *buff = *input_first;
         return *this;
     }
 

@@ -83,6 +83,219 @@ string& string::assign(const string& str, size_type pos, size_type count)
     return *this;
 }
 
+string& string::assign(const_iterator begin, const_iterator end)
+{
+    SSTL_ASSERT(end >= begin);
+    const size_type size = static_cast<size_type>(end - begin);
+    return assign(begin, size);
+}
+
+string& string::push_back(char c)
+{
+    char* place = _append_uninitialized(1);
+    *place = c;
+    return *this;
+}
+
+string& string::append(size_type size, char c)
+{
+    char* place = _append_uninitialized(size);
+    memset(place, c, size);
+    return *this;
+}
+
+string& string::append(const char* str)
+{
+    const size_type len = static_cast<size_type>(strlen(str));
+    return append(str, len);
+}
+
+string& string::append(const char* str, size_type size)
+{
+    if (size != 0)
+    {
+        char* place = _append_uninitialized(size);
+        memcpy(place, str, size);
+    }
+    return *this;
+}
+
+string& string::append(const string& other)
+{
+    return append(other.data(), other.size());
+}
+
+string& string::append(const_iterator begin, const_iterator end)
+{
+    SSTL_ASSERT(begin <= end);
+    const size_type size = static_cast<size_type>(end - begin);
+    return append(begin, size);
+}
+
+string::iterator string::erase(const_iterator position)
+{
+    size_type index = static_cast<size_type>(position - _bytes);
+    SSTL_ASSERT(index < size());
+    erase(index, 1);
+    return _bytes + index;
+}
+
+string::iterator string::erase(const_iterator first, const_iterator last)
+{
+    SSTL_ASSERT(_bytes >= first);
+    SSTL_ASSERT(last <= _bytes + size());
+    SSTL_ASSERT(first < last);
+    size_type pos = static_cast<size_type>(first - _bytes);
+    size_type count = static_cast<size_type>(last - first);
+    erase(pos, count);
+    return _bytes + pos;
+}
+
+string::iterator string::insert(const_iterator where, char ch)
+{
+    size_type pos = static_cast<size_type>(where - _bytes);
+    SSTL_ASSERT(pos <= size());
+    char* buff = _insert_uninitialized(pos, 1);
+    buff[0] = ch;
+    return buff + 1;
+}
+
+string::iterator string::insert(const_iterator where, size_type count, char c)
+{
+    size_type pos = static_cast<size_type>(where - _bytes);
+    insert(pos, count, c);
+    return _bytes + pos + count;
+}
+
+string& string::insert(size_type pos, size_type count, char c)
+{
+    SSTL_ASSERT(pos <= size());
+    char* buff = _insert_uninitialized(pos, count);
+    memset(buff, c, count);
+    return *this;
+}
+
+string& string::insert(size_type pos, const char* s)
+{
+    size_type size = static_cast<size_type>(strlen(s));
+    return insert(pos, s, size);
+}
+
+string& string::insert(size_type pos, const char* s, size_type count)
+{
+    SSTL_ASSERT(pos <= size());
+    char* buff = _insert_uninitialized(pos, count);
+    memcpy(buff, s, count);
+    return *this;
+}
+
+string& string::insert(size_type pos, const string& str)
+{
+    return insert(pos, str.data(), str.size());
+}
+
+string& string::insert(size_type pos, const string& str, size_type str_pos, size_type str_count)
+{
+    SSTL_ASSERT(str_pos + str_count < str.size());
+    return insert(pos, str.data() + str_pos, str_count);
+}
+
+string::iterator string::insert(const_iterator where, const_iterator input_first, const_iterator input_last)
+{
+    SSTL_ASSERT(input_first <= input_last);
+    SSTL_ASSERT(where >= _bytes && where <= _bytes + size());
+    size_type pos = where - _bytes;
+    size_type count = input_last - input_first;
+    insert(pos, input_first, count);
+    return begin() + pos + count;
+}
+
+string& string::replace(size_type pos, size_type count, const string& str)
+{
+    char* buff = _replace_uninitialized(pos, count, str.size());
+    memcpy(buff, str.data(), str.size());
+    return *this;
+}
+
+string& string::replace(const_iterator first, const_iterator last, const string& str)
+{
+    SSTL_ASSERT(first >= _bytes);
+    SSTL_ASSERT(last <= _bytes + size());
+    size_type pos = static_cast<unsigned>(first - _bytes);
+    size_type count = static_cast<unsigned>(last - first);
+    return replace(pos, count, str);
+}
+
+string& string::replace(size_type pos, size_type count, const string& str, size_type strPos, size_type strCount)
+{
+    SSTL_ASSERT(strPos <= str.size());
+    SSTL_ASSERT(strPos + strCount <= str.size());
+    return replace(pos, count, str.data() + strPos, strCount);
+}
+
+string& string::replace(size_type pos, size_type count, const char* s, size_type sCount)
+{
+    char* buff = _replace_uninitialized(pos, count, sCount);
+    memcpy(buff, s, sCount);
+    return *this;
+}
+
+string& string::replace(const_iterator first, const_iterator last, const char* s, size_type strCount)
+{
+    SSTL_ASSERT(first >= _bytes);
+    SSTL_ASSERT(last <= _bytes + size());
+    SSTL_ASSERT(first <= last);
+    size_type pos = static_cast<unsigned>(first - _bytes);
+    size_type count = static_cast<unsigned>(last - first);
+    return replace(pos, count, s, strCount);
+}
+
+string& string::replace(size_type pos, size_type count, const char* s)
+{
+    size_type sCount = static_cast<size_type>(strlen(s));
+    return replace(pos, count, s, sCount);
+}
+
+string& string::replace(const_iterator first, const_iterator last, const char* s)
+{
+    SSTL_ASSERT(first >= _bytes);
+    SSTL_ASSERT(last <= _bytes + size());
+    SSTL_ASSERT(first <= last);
+    size_type pos = static_cast<size_type>(first - _bytes);
+    size_type count = static_cast<size_type>(last - first);
+    return replace(pos, count, s);
+}
+
+string& string::replace(size_type pos, size_type count, size_type c_count, char c)
+{
+    char* buff = _replace_uninitialized(pos, count, c_count);
+    char* buffEnd = buff + c_count;
+    for ( ; buff != buffEnd; ++buff )
+        *buff = c;
+    return *this;
+}
+
+string& string::replace(const_iterator first, const_iterator last, size_type cCount, char c)
+{
+    SSTL_ASSERT(first >= _bytes);
+    SSTL_ASSERT(last <= _bytes + size());
+    SSTL_ASSERT(first <= last);
+    size_type pos = static_cast<size_type>(first - _bytes);
+    size_type count = static_cast<size_type>(last - first);
+    return replace(pos, count, cCount, c);
+}
+
+string& string::replace(const_iterator first, const_iterator last, const_iterator input_first, const_iterator input_last)
+{
+    SSTL_ASSERT(first >= _bytes);
+    SSTL_ASSERT(last <= _bytes + size());
+    SSTL_ASSERT(input_first <= input_last);
+    size_type pos = first - _bytes;
+    size_type count = last - first;
+    size_type str_count = input_last - input_first;
+    return replace(pos, count, input_first, str_count);
+}
+
 void string::reserve(size_type reserved_size)
 {
     if (reserved_size > capacity())
@@ -283,18 +496,22 @@ string string::operator+(char c) const
 {
     return _op_plus_right(&c, 1);
 }
+
 string string::operator+(const char* s) const
 {
     return _op_plus_right(s, strlen(s));
 }
+
 string string::operator+(const string& s) const
 {
     return _op_plus_right(s.data(), s.size());
 }
+
 string operator+(char c, const string& s2)
 {
     return s2._op_plus_left(&c, 1);
 }
+
 string operator+(const char* s1, const string& s2)
 {
     return s2._op_plus_left(s1, strlen(s1));
@@ -434,6 +651,7 @@ char* string::_new_uninitialized(size_type size)
 char* string::unshare()
 {
     _buffer_type* buff = _get_buffer();
+    SSTL_ASSERT(buff != _empty_string_buffer);
     if (buff->_ref_count > 0)
     {
         char* bytes = _new_uninitialized(buff->_size);
