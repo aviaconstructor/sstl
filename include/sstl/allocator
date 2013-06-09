@@ -5,43 +5,55 @@
 #include "sstl_common.h"
 #include "atomic"
 #include "iterator"
+#include "algorithm"
 
 namespace SSTL_NAMESPACE {
 
 // SSTL allocator is not standard as it takes care of sequences, not individual objects
 
-/// Plain Old Data allocator
+/// Base allocator, parametrized each different size of object
 ///
-/// This allocator is suitable for sequences of items with no constructor or destructor.
-/// Also, items should be movable in memory.
+/// Many of methods of this class are out-line, and this very same allocator instance is reused
+/// for many types of the same size. For example, all collections of pointers
+/// are going to use the same instance.
+/// When data size is a power of two, the compiler will replace multiplication with shift.
 ///
+template
+   <sstl_size_type S>
 class allocator_base
 {
 public:
-    allocator_base()
-        : _buffer(NULL), _size(0), _capacity(0)
-    {}
 
-    ~allocator_base()
+    /// Do not allocate less than this number of elements
+    ///
+    static const sstl_size_type minimum_capacity = 4;
+
+public:
+    allocator_base<S>() : _buffer(NULL), _size(0), _capacity(0) {}
+
+    ~allocator_base<S>() { _delete_buffer(); }
+
+    void operator=(const allocator_base<S>& v);
+    bool operator==(const allocator_base<S>& v) const;
+    bool operator!=(const allocator_base<S>& v) const {return !operator==(v);}
+
+    char* at(sstl_size_type n)
     {
-        _delete_buffer();
+        SSTL_ASSERT(n < _size);
+        return _buffer + (_size * S);
     }
 
-    void operator=(const allocator_base& v);
-    bool operator==(const allocator_base& v) const;
-    bool operator!=(const allocator_base& v) const
+    const char* at(sstl_size_type n) const
     {
-        return !operator==(v);
+        SSTL_ASSERT(n < _size);
+        return _buffer + (_size * S);
     }
 
-    char* data() {return _buffer;}
-    const char* cdata() const {return _buffer;}
+    const char* begin() {return _buffer;}
+    const char* end()   {return _buffer + (_size * S);}
 
-    char* begin() {return _buffer;}
-    char* end()   {return _buffer + _size;}
-
-    char* cbegin() const {return _buffer;}
-    char* cend() const   {return _buffer + _size;}
+    const char* cbegin() const {return _buffer;}
+    const char* cend() const   {return _buffer + (_size * S);}
 
     sstl_size_type size() const {return _size;}
     sstl_size_type capacity() const {return _capacity;}
@@ -50,18 +62,7 @@ public:
 
     void shrink_to_fit();
 
-    char* operator[](sstl_size_type n)
-    {
-        SSTL_ASSERT(n < _size);
-        return _buffer + n;
-    }
-
-    const char* operator[](sstl_size_type n) const
-    {
-        SSTL_ASSERT(n < _size);
-        return _buffer + n;
-    }
-
+    void clear() {_size = 0;}
     char* insert(sstl_size_type n, sstl_size_type count);
     void erase(sstl_size_type n, sstl_size_type count);
     void shrink(sstl_size_type new_size)
@@ -70,13 +71,39 @@ public:
         _size = new_size;
     }
     char* grow(sstl_size_type n);
-    void clear() {_size = 0;}
 
-    void swap(allocator_base& other);
+    void swap(allocator_base<S>& other)
+    {
+        // Also works for the rare case of &other == this
+        SSTL_NAMESPACE::swap(other._buffer, _buffer);
+        SSTL_NAMESPACE::swap(other._size, _size);
+        SSTL_NAMESPACE::swap(other._capacity, _capacity);
+    }
 
 private:
 
-    void _delete_buffer();
+    void _delete_buffer() { delete [] _buffer; }
+
+    inline sstl_size_type _adjust_capacity(sstl_size_type size)
+    {
+        if (size < 4)
+            size = 4;
+        else // adjust size to the nearest power of two trickery
+        {
+            --size;
+            size |= size >> 1;
+            size |= size >> 2;
+            size |= size >> 4;
+            size |= size >> 8;
+            size |= size >> 16;
+            ++size;
+        }
+        return size;
+    }
+
+private:
+
+    allocator_base(const allocator_base<S>&) SSTL_MEMBER_DELETE;
 
 private:
 
@@ -84,6 +111,231 @@ private:
     sstl_size_type _size;
     sstl_size_type _capacity;
 };
+
+template
+   <typename T>
+class allocator_typed : public allocator_base<sizeof(T)>
+{
+public:
+
+    typedef allocator_base<sizeof(T)> abase;
+    typedef T*       iterator;
+    typedef const T* const_iterator;
+
+public:
+
+    allocator_typed<T>() : abase() {}
+    ~allocator_typed<T>() {}
+
+    T& at(sstl_size_type n)              {return *reinterpret_cast<T*>(abase::at(n));}
+    const T& at(sstl_size_type n) const  {return *reinterpret_cast<const T*>(abase::at(n));}
+
+    iterator begin() {return reinterpret_cast<iterator>(abase::begin());}
+    iterator end()   {return reinterpret_cast<iterator>(abase::end());}
+
+    const_iterator cbegin() const {return reinterpret_cast<const_iterator>(abase::begin());}
+    const_iterator cend() const   {return reinterpret_cast<const_iterator>(abase::end());}
+};
+
+/// Data allocator for POD data types (Plain old data)
+///
+/// This allocator is suitable for sequences of items with no constructor or destructor.
+/// Items should be movable in memory, and their initialization is done by zeroing them out.
+///
+/// The implementation is a thin type casting layer above the base allocator
+///
+template
+   <typename T>
+class allocator_pod : allocator_typed<T>
+{
+public:
+
+    typedef allocator_typed<T> abase;
+
+public:
+    allocator_pod() : abase() {}
+
+    ~allocator_pod() {}
+
+    void operator=(const allocator_pod<T>& v) {abase::operator=(v);}
+
+    bool operator==(const allocator_pod<T>& v) const {return abase::operator==(v);}
+    bool operator!=(const allocator_pod<T>& v) const {return !abase::operator==(v);}
+
+    iterator insert(sstl_size_type n, sstl_size_type count) {return reinterpret_cast<iterator>(abase::insert(n, count));}
+    iterator grow(sstl_size_type n) {return reinterpret_cast<iterator>(abase::grow(n));}
+};
+
+/// Data allocator for complex data types with nontrivial constructor, destructor, etc.
+///
+template
+   <typename T>
+class allocator : allocator_typed<T>
+{
+public:
+
+    typedef allocator_typed<T> abase;
+
+public:
+    allocator() : abase() {}
+
+    ~allocator() {}
+
+    void operator=(const allocator<T>& v)
+    {
+        if (this != &v)
+        {
+            clear();
+            iterator this_it = grow(v._size);
+            const_iterator it = v.begin();
+            const_iterator it_end = v.end();
+            for ( ; it != it_end; ++it, ++this_it)
+                *this_it = *it;
+        }
+        return true;
+    }
+
+    bool operator==(const allocator<T>& v)
+    {
+        if (this != &v)
+        {
+            if (_size != v._size)
+                return false;
+            const_iterator it = begin();
+            const_iterator itEnd = end();
+            const_iterator itOther = v.begin();
+            for ( ; it != itEnd; ++it, ++itOther)
+                if (*it != itOther)
+                    return false;
+        }
+        return true;
+    }
+
+    bool operator!=(const allocator<S>& v) const {return !operator==(v);}
+
+    T* insert(sstl_size_type n, sstl_size_type count) {return reinterpret_cast<const T*>(abase::insert(n, count);}
+    T* grow(sstl_size_type n) {return reinterpret_cast<const T*>(abase::grow(n);}
+};
+
+
+// IMPLEMENTATION:
+
+template
+   <sstl_size_type S>
+void allocator_base<S>::operator=(const allocator_base<S>& v)
+{
+    if (&v != this)
+    {
+        const sstl_size_type size_of = v._size * S;
+        if (_capacity < v._size)
+        {
+            _delete_buffer();
+            _buffer = new char[size_of];
+            _capacity = v._size;
+        }
+        _size = v._size;
+        memcpy(_buffer, v._buffer, size_of);
+    }
+}
+
+template
+   <sstl_size_type S>
+bool allocator_base<S>::operator==(const allocator_base<S>& v) const
+{
+    if (&v == this)
+        return true;
+    if (v._size != _size)
+        return false;
+    return memcmp(_buffer, v._buffer, _size * S) == 0;
+}
+
+template
+   <sstl_size_type S>
+void allocator_base<S>::reserve(sstl_size_type n)
+{
+    if (n > _capacity)
+    {
+        char* b = new char[n * S];
+        memcpy(b, _buffer, _size * S);
+        _delete_buffer();
+        _buffer = b;
+        _capacity = n;
+    }
+}
+
+template
+   <sstl_size_type S>
+void allocator_base<S>::shrink_to_fit()
+{
+    if (_size < _capacity)
+    {
+        if (_size == 0)
+        {
+            _delete_buffer();
+            _buffer = NULL;
+        }
+        else
+        {
+            const sstl_size_type size_of = _size * S;
+            char* b = new char[size_of];
+            memcpy(b, _buffer, size_of);
+            _delete_buffer();
+            _buffer = b;
+        }
+        _capacity = _size;
+    }
+}
+
+template
+   <sstl_size_type S>
+char* allocator_base<S>::insert(sstl_size_type n, sstl_size_type count)
+{
+    const sstl_size_type new_size = _size + count;
+    const sstl_size_type offset_n = n * S;
+    const sstl_size_type offset_count = count * S;
+    if (new_size > _capacity)
+    {
+        sstl_size_type new_capacity = _adjust_capacity(new_size);
+        char* b = new char[new_capacity * S];
+        memcpy(b, _buffer, offset_n);
+        memcpy(b + offset_n + offset_count, _buffer + offset_n, (_size - count) * S);
+        _delete_buffer();
+        _buffer = b;
+        _capacity = new_capacity;
+    }
+    else
+        memmove(b + offset_n + offset_count, _buffer + offset_n, (_size - count) * S);
+    _size = new_size;
+    return _buffer + offset_n;
+}
+
+template
+   <sstl_size_type S>
+void allocator_base<S>::erase(sstl_size_type n, sstl_size_type count)
+{
+    SSTL_ASSERT(n + count <= _size);
+    const sstl_size_type offset = (n + count) * S;
+    memmove(_buffer + n, _buffer + offset, _size * S - offset);
+}
+
+template
+   <sstl_size_type S>
+char* allocator_base<S>::grow(sstl_size_type n)
+{
+    SSTL_ASSERT(_size < n);
+    const sstl_size_type offset_size = n * S;
+    if (n > _capacity)
+    {
+        sstl_size_type new_capacity = _adjust_capacity(n);
+        char* b = new char[new_capacity * S];
+        memcpy(b, _buffer, offset_size);
+        _delete_buffer();
+        _buffer = b;
+        _capacity = new_capacity;
+    }
+    _size = n;
+    return _buffer + offset_size;
+}
 
 } // namespace
 

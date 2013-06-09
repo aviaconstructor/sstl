@@ -57,19 +57,19 @@ public:
         SSTL_ASSERT(first <= last);
         _allocator.resize(static_cast<size_type>(last - first));
         iterator it = _allocator.begin();
-        for ( ; first < last; ++first, ++it )
+        for ( ; first < last; ++first, ++it)
             *it = *first;
     }
 
     vector(const vector& x)
         : _allocator()
     {
-
+        operator=(x);
     }
 
     ~vector()
     {
-        _destroy_items(begin(), end());
+        _allocator._destroy_items(begin(), end());
     }
 
     iterator begin() {return _allocator.begin();}
@@ -90,26 +90,26 @@ public:
     const_reverse_iterator crbegin() const {return const_reverse_iterator(_allocator.cend());}
     const_reverse_iterator crend() const   {return const_reverse_iterator(_allocator.cbegin());}
 
-    char& front()
+    T& front()
     {
         SSTL_ASSERT(!empty());
-        return *begin();
+        return *_allocator.begin();
     }
-    const char& front() const
+    const T& front() const
     {
         SSTL_ASSERT(!empty());
-        return *cbegin();
+        return *_allocator.cbegin();
     }
 
-    char& back()
+    T& back()
     {
         SSTL_ASSERT(!empty());
-        return *(end() - 1);
+        return *(_allocator.end() - 1);
     }
-    const char& back() const
+    const T& back() const
     {
         SSTL_ASSERT(!empty());
-        return *(cend() - 1);
+        return *(_allocator.cend() - 1);
     }
 
     /// Maximum possible size of the vector, as determined by the limits of the involved types
@@ -137,19 +137,13 @@ public:
         return static_cast<size_type>(_allocator.capacity());
     }
 
-    void reserve(size_type n)
-    {
-        _allocator.reserve(n);
-    }
+    void reserve(size_type n) {_allocator.reserve(n);}
 
-    void shrink_to_fit()
-    {
-        _allocator.shrink_to_fit();
-    }
+    void shrink_to_fit() {_allocator.shrink_to_fit();}
 
     vector& operator=(const vector& v)
     {
-
+        _allocator.operator=(v);
         return *this;
     }
 
@@ -177,10 +171,10 @@ public:
         return _allocator;
     }
 
-    reference       operator[](size_type n)       {return *static_cast<pointer>(_allocator.item(n));}
-    const_reference operator[](size_type n) const {return *static_cast<pointer>(_allocator.item(n));}
-    reference       at(size_type n)               {return *static_cast<pointer>(_allocator.item(n));}
-    const_reference at(size_type n) const         {return *static_cast<pointer>(_allocator.item(n));}
+    reference       operator[](size_type n)       {return _allocator.at(n);}
+    const_reference operator[](size_type n) const {return _allocator.at(n);}
+    reference       at(size_type n)               {return _allocator.at(n);}
+    const_reference at(size_type n) const         {return _allocator.at(n);}
 
     void push_back(const_reference v)
     {
@@ -227,7 +221,7 @@ public:
     void resize(size_type new_size);
     void resize(size_type new_size, const_reference v);
 
-    void swap(vector&);
+    void swap(vector<T,A>&);
 
 private:
 

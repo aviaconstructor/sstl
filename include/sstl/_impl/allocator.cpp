@@ -1,13 +1,8 @@
+/*
 #include "../allocator"
 #include "../algorithm"
 
 namespace SSTL_NAMESPACE {
-
-void allocator_base::_delete_buffer()
-{
-    delete [] _buffer;
-    _buffer = NULL; // helpful for debugging, etc
-}
 
 void allocator_base::operator=(const allocator_base& v)
 {
@@ -80,9 +75,11 @@ char* allocator_base::grow(sstl_size_type n)
 
 void allocator_base::swap(allocator_base& other)
 {
+    // Also works for
     SSTL_NAMESPACE::swap(other._buffer, _buffer);
     SSTL_NAMESPACE::swap(other._size, _size);
     SSTL_NAMESPACE::swap(other._capacity, _capacity);
 }
 
 } // namespace
+*/
