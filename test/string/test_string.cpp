@@ -835,6 +835,8 @@ TEST(test_string, operator_plus)
 
 TEST(test_string, operator_plus_equal)
 {
+    string s1;
+    s1 += "abcdefghijklmnopqABCDEFGHIJKLMNOPQ0123456789";
     s1 += '+';
     s1 += '-';
     s1 += "()";
