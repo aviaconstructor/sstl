@@ -118,7 +118,7 @@ public: // Constants:
 
     static const size_type npos = 0xFFFFFFFF;
     static const unsigned _buffer_type_header_sizeof = sizeof(_buffer_type) - sizeof(sstl_uint64) * 2;
-    static const unsigned _capacity_granularity = sizeof(sstl_uint64) * 2;
+    static const unsigned _minimum_capacity = sizeof(sstl_uint64) * 2;
 
 public:
 

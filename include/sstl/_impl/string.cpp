@@ -9,13 +9,18 @@ string string::_empty_string(&string::_empty_string_buffer);
 
 inline sstl_size_type _adjust_capacity(sstl_size_type size)
 {
-    SSTL_ASSERT(size < numeric_limits<sstl_size_type>::max() - string::_capacity_granularity);
-
-    const sstl_size_type _capacity_bits = string::_capacity_granularity - 1;
-    SSTL_STATIC_ASSERT((string::_capacity_granularity & _capacity_bits) == 0, "_capacity_granularity should be the power of two");
-
-    size += _capacity_bits;
-    size &= ~_capacity_bits; // round up to the nearest value divisible by _capacity_granularity
+    if (size <= string::_minimum_capacity)
+        size = string::_minimum_capacity;
+    else // adjust size to the nearest power of two trickery
+    {
+        --size;
+        size |= size >> 1;
+        size |= size >> 2;
+        size |= size >> 4;
+        size |= size >> 8;
+        size |= size >> 16;
+        ++size;
+    }
     return size;
 }
 
@@ -633,7 +638,7 @@ string::_buffer_type* string::_new_uninitialized_buffer(size_type size, size_typ
 {
     SSTL_ASSERT(size <= capacity);
     SSTL_ASSERT(capacity != 0);
-    SSTL_ASSERT(capacity >= _capacity_granularity);
+    SSTL_ASSERT(capacity >= _minimum_capacity);
     unsigned buffer_sizeof = _buffer_type_header_sizeof + capacity;
     _buffer_type* buff = reinterpret_cast<_buffer_type*>(new char[buffer_sizeof]);
     buff->_hash = 0;
@@ -651,7 +656,7 @@ char* string::_new_uninitialized(size_type size)
 char* string::unshare()
 {
     _buffer_type* buff = _get_buffer();
-    SSTL_ASSERT(buff != _empty_string_buffer);
+    SSTL_ASSERT(buff != &_empty_string_buffer);
     if (buff->_ref_count > 0)
     {
         char* bytes = _new_uninitialized(buff->_size);
