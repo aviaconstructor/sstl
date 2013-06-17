@@ -760,6 +760,223 @@ TEST(test_string, append)
                   "012345678901234567890123456789012345678901234567890123456789ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ");
 }
 
+static void _check_insert(const string& init, string::size_type where, const string& what, const string& result)
+{
+    string ret;
+    string s = init;
+#if !defined(SSTL_TEST_NATIVE_STL)
+    s.insert(init.begin() + where, what.begin(), what.end());
+    ASSERT_EQ(s, result);
+
+    s = init;
+    s.insert(init.cbegin() + where, what.cbegin(), what.cend());
+    ASSERT_EQ(s, result);
+#endif
+
+    s = init;
+    ret = s.insert(where, what);
+    ASSERT_EQ(s, result);
+    ASSERT_EQ(ret, result);
+
+    s = init;
+    ret = s.insert(where, what, 0, what.size());
+    ASSERT_EQ(s, result);
+    ASSERT_EQ(ret, result);
+
+    s = init;
+    ret = s.insert(where, what.data(), what.size());
+    ASSERT_EQ(s, result);
+    ASSERT_EQ(ret, result);
+
+    s = init;
+    ret = s.insert(where, what.c_str());
+    ASSERT_EQ(s, result);
+    ASSERT_EQ(ret, result);
+
+    if (what.size() == 1)
+    {
+        s = init;
+        s.insert(where, 1, what[0]);
+        ASSERT_EQ(s, result);
+
+        s = init;
+        s.insert(s.begin() + where, 1, what[0]);
+        ASSERT_EQ(s, result);
+    }
+}
+
+TEST(test_string, insert)
+{
+    _check_insert("", 0, "", "");
+    _check_insert("", 0, "a", "a");
+    _check_insert("b", 0, "", "b");
+    _check_insert("b", 0, "c", "cb");
+    _check_insert("b", 1, "c", "bc");
+
+    _check_insert("abc", 0, "", "abc");
+    _check_insert("abc", 1, "", "abc");
+    _check_insert("abc", 2, "", "abc");
+    _check_insert("abc", 3, "", "abc");
+
+    _check_insert("abc", 0, "0", "0abc");
+    _check_insert("abc", 1, "1", "a1bc");
+    _check_insert("abc", 2, "2", "ab2c");
+    _check_insert("abc", 3, "3", "abc3");
+
+    // insertion leads to prompt buffer reallocation
+    _check_insert("abcdefghijklmn",  0, "0123456789ABCDEF", "0123456789ABCDEFabcdefghijklmn");
+    _check_insert("abcdefghijklmn",  1, "0123456789ABCDEF", "a0123456789ABCDEFbcdefghijklmn");
+    _check_insert("abcdefghijklmn", 12, "0123456789ABCDEF", "abcdefghijkl0123456789ABCDEFmn");
+    _check_insert("abcdefghijklmn", 14, "0123456789ABCDEF", "abcdefghijklmn0123456789ABCDEF");
+
+    // extra large buffer reallocation
+    _check_insert("abcdefghijklmnopqrstuvwxyz", 0, "0123456789ABCDEF0123456789ABCDEF",
+                  "0123456789ABCDEF0123456789ABCDEFabcdefghijklmnopqrstuvwxyz");
+    _check_insert("abcdefghijklmnopqrstuvwxyz", 1, "0123456789ABCDEF0123456789ABCDEF",
+                  "a0123456789ABCDEF0123456789ABCDEFbcdefghijklmnopqrstuvwxyz");
+    _check_insert("abcdefghijklmnopqrstuvwxyz", 25, "0123456789ABCDEF0123456789ABCDEF",
+                  "abcdefghijklmnopqrstuvwxy0123456789ABCDEF0123456789ABCDEFz");
+    _check_insert("abcdefghijklmnopqrstuvwxyz", 26, "0123456789ABCDEF0123456789ABCDEF",
+                  "abcdefghijklmnopqrstuvwxyz0123456789ABCDEF0123456789ABCDEF");
+
+    // building string with insertion
+    string s;
+    for (char c1 = 'z'; c1 >= 'a'; --c1)
+        s.insert(0u, 1, c1);
+    ASSERT_EQ(s, "abcdefghijklmnopqrstuvwxyz");
+    for (char c2 = 'A'; c2 <= 'Z'; ++c2)
+        s.insert(s.size(), 1, c2);
+    ASSERT_EQ(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
+    for (char c3 = '0'; c3 <= '9'; ++c3)
+        s.insert(26u, string(1, c3));
+    ASSERT_EQ(s, "abcdefghijklmnopqrstuvwxyz9876543210ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+
+    // chaining functions, mixing with return value
+    s = "abc";
+    s = s.insert(0u, "9").insert(0u, 1u, '8').insert(0, "7", 1);
+    ASSERT_EQ(s, "789abc");
+
+}
+
+static void _check_replace(const string& init, string::size_type where, string::size_type count, const string& what, const string& result)
+{
+    string ret;
+    string s = init;
+#if !defined(SSTL_TEST_NATIVE_STL)
+    ret = s.replace(s.begin() + where, s.begin() + where + count, what.begin(), what.end());
+    ASSERT_EQ(s, result);
+    ASSERT_EQ(ret, result);
+
+    s = init;
+    ret = s.replace(s.cbegin() + where, s.cbegin() + where + count, what.cbegin(), what.cend());
+    ASSERT_EQ(s, result);
+    ASSERT_EQ(ret, result);
+#endif
+
+    s = init;
+    ret = s.replace(where, count, what);
+    ASSERT_EQ(s, result);
+    ASSERT_EQ(ret, result);
+
+    s = init;
+    ret = s.replace(where, count, what, 0, what.size());
+    ASSERT_EQ(s, result);
+    ASSERT_EQ(ret, result);
+
+    s = init;
+    ret = s.replace(where, count, what.data(), what.size());
+    ASSERT_EQ(s, result);
+    ASSERT_EQ(ret, result);
+
+    s = init;
+    ret = s.replace(where, count, what.c_str());
+    ASSERT_EQ(s, result);
+    ASSERT_EQ(ret, result);
+
+    if (what.size() == 1)
+    {
+        s = init;
+        s.replace(where, count, 1, what[0]);
+        ASSERT_EQ(s, result);
+
+        s = init;
+        s.replace(s.begin() + where, s.begin() + where + count, 1, what[0]);
+        ASSERT_EQ(s, result);
+    }
+}
+
+TEST(test_string, replace)
+{
+    _check_replace("",  0, 0, "",  "");
+    _check_replace("",  0, 0, "a", "a");
+    _check_replace("b", 0, 0, "",  "b");
+    _check_replace("b", 0, 0, "c", "cb");
+    _check_replace("b", 1, 0, "",  "b");
+    _check_replace("b", 1, 0, "c", "bc");
+    _check_replace("b", 0, 1, "",  "");
+    _check_replace("b", 0, 1, "c", "c");
+
+    _check_replace("abc", 0, 0, "", "abc");
+    _check_replace("abc", 1, 0, "", "abc");
+    _check_replace("abc", 2, 0, "", "abc");
+    _check_replace("abc", 3, 0, "", "abc");
+
+    _check_replace("abc", 0, 0, "0", "0abc");
+    _check_replace("abc", 1, 0, "1", "a1bc");
+    _check_replace("abc", 2, 0, "2", "ab2c");
+    _check_replace("abc", 3, 0, "3", "abc3");
+
+    _check_replace("abc", 0, 3, "ABC", "ABC");
+    _check_replace("abc", 1, 2, "ABC", "aABC");
+    _check_replace("abc", 2, 1, "ABC", "abABC");
+    _check_replace("abc", 3, 0, "ABC", "abcABC");
+
+    _check_replace("abcdefghijklmn",  0, 0, "0123456789ABCDEF", "0123456789ABCDEFabcdefghijklmn");
+    _check_replace("abcdefghijklmn",  1, 0, "0123456789ABCDEF", "a0123456789ABCDEFbcdefghijklmn");
+    _check_replace("abcdefghijklmn", 12, 0, "0123456789ABCDEF", "abcdefghijkl0123456789ABCDEFmn");
+    _check_replace("abcdefghijklmn", 14, 0, "0123456789ABCDEF", "abcdefghijklmn0123456789ABCDEF");
+
+    _check_replace("abcdefghijklmn",  0,  1, "0123456789ABCDEF", "0123456789ABCDEFbcdefghijklmn");
+    _check_replace("abcdefghijklmn",  1,  1, "0123456789ABCDEF", "a0123456789ABCDEFcdefghijklmn");
+    _check_replace("abcdefghijklmn", 12,  1, "0123456789ABCDEF", "abcdefghijkl0123456789ABCDEFn");
+    _check_replace("abcdefghijklmn", 13,  1, "0123456789ABCDEF", "abcdefghijklm0123456789ABCDEF");
+    _check_replace("abcdefghijklmn",  0, 14, "0123456789ABCDEF", "0123456789ABCDEF");
+    _check_replace("abcdefghijklmn",  1, 13, "0123456789ABCDEF", "a0123456789ABCDEF");
+
+    _check_replace("abcdefghijklmnopqrstuvwxyz", 0, 26, "", "");
+    _check_replace("abcdefghijklmnopqrstuvwxyz", 1, 25, "", "a");
+    _check_replace("abcdefghijklmnopqrstuvwxyz", 1, 24, "", "az");
+    _check_replace("abcdefghijklmnopqrstuvwxyz", 24, 2, "", "abcdefghijklmnopqrstuvwx");
+    _check_replace("abcdefghijklmnopqrstuvwxyz", 25, 1, "", "abcdefghijklmnopqrstuvwxy");
+
+    _check_replace("abcdefghijklmnopqrstuvwxyz", 0, 26, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+    _check_replace("abcdefghijklmnopqrstuvwxyz", 0, 0, "0123456789ABCDEF0123456789ABCDEF",
+                  "0123456789ABCDEF0123456789ABCDEFabcdefghijklmnopqrstuvwxyz");
+    _check_replace("abcdefghijklmnopqrstuvwxyz", 1, 0, "0123456789ABCDEF0123456789ABCDEF",
+                  "a0123456789ABCDEF0123456789ABCDEFbcdefghijklmnopqrstuvwxyz");
+    _check_replace("abcdefghijklmnopqrstuvwxyz", 25, 0, "0123456789ABCDEF0123456789ABCDEF",
+                  "abcdefghijklmnopqrstuvwxy0123456789ABCDEF0123456789ABCDEFz");
+    _check_replace("abcdefghijklmnopqrstuvwxyz", 26, 0, "0123456789ABCDEF0123456789ABCDEF",
+                  "abcdefghijklmnopqrstuvwxyz0123456789ABCDEF0123456789ABCDEF");
+
+    // building string with replacement
+    string s;
+    for (char c1 = 'z'; c1 >= 'a'; --c1)
+        s.replace(0u, 0u, 1, c1);
+    ASSERT_EQ(s, "abcdefghijklmnopqrstuvwxyz");
+    for (char c2 = 'A'; c2 <= 'Z'; ++c2)
+        s.replace(s.size(), 0u, 1, c2);
+    ASSERT_EQ(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
+    for (char c3 = '0'; c3 <= '9'; ++c3)
+        s.replace(26u, 0u, string(1, c3));
+    ASSERT_EQ(s, "abcdefghijklmnopqrstuvwxyz9876543210ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+
+    // chaining functions, mixing with return value
+    s = "abc";
+    s = s.replace(0u, 0u, "9").replace(0u, 0u, 1u, '8').replace(0u, 0u, "7", 1);
+    ASSERT_EQ(s, "789abc");
+}
+
 static void _check_copy(const string& s, string::size_type count, string::size_type pos)
 {
     char buff[256];

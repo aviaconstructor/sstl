@@ -201,7 +201,7 @@ string& string::insert(size_type pos, const string& str)
 
 string& string::insert(size_type pos, const string& str, size_type str_pos, size_type str_count)
 {
-    SSTL_ASSERT(str_pos + str_count < str.size());
+    SSTL_ASSERT(str_pos + str_count <= str.size());
     return insert(pos, str.data() + str_pos, str_count);
 }
 
@@ -656,18 +656,20 @@ char* string::_new_uninitialized(size_type size)
 char* string::unshare()
 {
     _buffer_type* buff = _get_buffer();
-    SSTL_ASSERT(buff != &_empty_string_buffer);
-    if (buff->_ref_count > 0)
+    if (buff != &_empty_string_buffer) // unsharing the empty buffer is not going to change it
     {
-        char* bytes = _new_uninitialized(buff->_size);
-        memcpy(bytes, _bytes, buff->_size);
-        _get_buffer()->_ref_decrement();
-        _bytes = bytes;
-        return bytes;
-    }
-    else
-    {
-        SSTL_ASSERT(!is_interned()); // attempt to modify a non-referenced interned string is made somehow
+        if (buff->_ref_count > 0)
+        {
+            char* bytes = _new_uninitialized(buff->_size);
+            memcpy(bytes, _bytes, buff->_size);
+            _get_buffer()->_ref_decrement();
+            _bytes = bytes;
+            return bytes;
+        }
+        else
+        {
+            SSTL_ASSERT(!is_interned()); // attempt to modify a non-referenced interned string is made somehow
+        }
     }
     return NULL;
 }
@@ -698,7 +700,9 @@ char* string::_insert_uninitialized(size_type index, size_type count)
     SSTL_ASSERT(count != npos);
     size_type old_size = size();
     size_type new_size = old_size + count;
-    if (is_shared() || new_size > capacity())
+    if (!is_shared() && new_size < capacity())
+        memmove(_bytes + index + count, _bytes + index, old_size - index);
+    else // grow    }
     {
         char* bytes = _new_uninitialized(new_size);
         memcpy(bytes, _bytes, index);
@@ -710,7 +714,7 @@ char* string::_insert_uninitialized(size_type index, size_type count)
         _bytes = bytes;
     }
     _get_buffer()->_size = new_size;
-    return _bytes + old_size;
+    return _bytes + index;
 }
 
 char* string::_replace_uninitialized(size_type pos, size_type count, size_type new_count)
