@@ -6,6 +6,7 @@
 #include "atomic"
 #include "iterator"
 #include "algorithm"
+#include "limits"
 
 namespace SSTL_NAMESPACE {
 
@@ -24,14 +25,20 @@ class allocator_base
 {
 public:
 
-    /// Do not allocate less than this number of elements
+    /// Minimum possible allocator size
     ///
-    static const sstl_size_type minimum_capacity = 4;
+    /// Depends on the obect size as follows:
+    ///   - if object size is 1 byte minimum_capacity is 16
+    ///   - if object size is 2 bytes minimum_capacity is 8
+    ///   - in all other cases the minimum capacity is 4 elements
+    /// Therefore, if not counting an awkward case of 3-byte sizeof, no less than 16 bytes are allocated.
+    ///
+    static const sstl_size_type minimum_capacity = (S <= 2) ? (16 / S) : 4;
 
 public:
-    allocator_base<S>() : _buffer(NULL), _size(0), _capacity(0) {}
+    allocator_base() : _buffer(NULL), _size(0), _capacity(0) {}
 
-    ~allocator_base<S>() { _delete_buffer(); }
+    ~allocator_base() { delete [] _buffer; }
 
     void operator=(const allocator_base<S>& v);
     bool operator==(const allocator_base<S>& v) const;
@@ -49,8 +56,8 @@ public:
         return _buffer + (_size * S);
     }
 
-    const char* begin() {return _buffer;}
-    const char* end()   {return _buffer + (_size * S);}
+    char* begin() {return _buffer;}
+    char* end()   {return _buffer + (_size * S);}
 
     const char* cbegin() const {return _buffer;}
     const char* cend() const   {return _buffer + (_size * S);}
@@ -58,19 +65,24 @@ public:
     sstl_size_type size() const {return _size;}
     sstl_size_type capacity() const {return _capacity;}
 
+    static SSTL_CONSTEXPR sstl_size_type max_size() {return numeric_limits<sstl_size_type>::max() / S;}
+
     void reserve(sstl_size_type n);
 
     void shrink_to_fit();
 
+    char* insert_uninitialized(sstl_size_type n, sstl_size_type count);
+    char* append_uninitialized(sstl_size_type count);
+    void insert(sstl_size_type n, sstl_size_type count, const void* buff);
+    void append(sstl_size_type count, const void* buff);
+
     void clear() {_size = 0;}
-    char* insert(sstl_size_type n, sstl_size_type count);
-    void erase(sstl_size_type n, sstl_size_type count);
     void shrink(sstl_size_type new_size)
     {
         SSTL_ASSERT(new_size <= _size);
         _size = new_size;
     }
-    char* grow(sstl_size_type n);
+    void erase(sstl_size_type n, sstl_size_type count);
 
     void swap(allocator_base<S>& other)
     {
@@ -82,13 +94,11 @@ public:
 
 private:
 
-    void _delete_buffer() { delete [] _buffer; }
-
     inline sstl_size_type _adjust_capacity(sstl_size_type size)
     {
-        if (size < 4)
-            size = 4;
-        else // adjust size to the nearest power of two trickery
+        if (size < minimum_capacity)
+            size = minimum_capacity;
+        else // below is a well-known trickery of adjusting size up to the nearest power of two
         {
             --size;
             size |= size >> 1;
@@ -103,18 +113,26 @@ private:
 
 private:
 
-    allocator_base(const allocator_base<S>&) SSTL_MEMBER_DELETE;
+    allocator_base(const allocator_base&) SSTL_MEMBER_DELETE;
 
-private:
+protected:
 
     char* _buffer;
     sstl_size_type _size;
     sstl_size_type _capacity;
 };
 
+/// Data allocator for POD data types (Plain old data)
+///
+/// This allocator is suitable for sequences of items that corespond to definition of POD.
+/// They should have no constructor or destructor, should be movable in memory,
+/// and their initialization is done by zeroing them out.
+///
+/// The implementation is a thin type casting layer above the typed allocator
+///
 template
    <typename T>
-class allocator_typed : public allocator_base<sizeof(T)>
+class allocator_pod : public allocator_base<sizeof(T)>
 {
 public:
 
@@ -123,11 +141,16 @@ public:
     typedef const T* const_iterator;
 
 public:
+    allocator_pod() : abase() {}
 
-    allocator_typed<T>() : abase() {}
-    ~allocator_typed<T>() {}
+    ~allocator_pod() {}
 
-    T& at(sstl_size_type n)              {return *reinterpret_cast<T*>(abase::at(n));}
+    void operator=(const allocator_pod& v) {abase::operator=(v);}
+
+    bool operator==(const allocator_pod& v) const {return abase::operator==(v);}
+    bool operator!=(const allocator_pod& v) const {return abase::operator!=(v);}
+
+    T&       at(sstl_size_type n)        {return *reinterpret_cast<T*>(abase::at(n));}
     const T& at(sstl_size_type n) const  {return *reinterpret_cast<const T*>(abase::at(n));}
 
     iterator begin() {return reinterpret_cast<iterator>(abase::begin());}
@@ -135,58 +158,77 @@ public:
 
     const_iterator cbegin() const {return reinterpret_cast<const_iterator>(abase::begin());}
     const_iterator cend() const   {return reinterpret_cast<const_iterator>(abase::end());}
-};
 
-/// Data allocator for POD data types (Plain old data)
-///
-/// This allocator is suitable for sequences of items with no constructor or destructor.
-/// Items should be movable in memory, and their initialization is done by zeroing them out.
-///
-/// The implementation is a thin type casting layer above the base allocator
-///
-template
-   <typename T>
-class allocator_pod : allocator_typed<T>
-{
-public:
+    iterator insert_uninitialized(sstl_size_type n, sstl_size_type count)
+    {
+        return reinterpret_cast<iterator>(abase::insert_uninitialized(n, count));
+    }
 
-    typedef allocator_typed<T> abase;
+    iterator append_uninitialized(sstl_size_type n)
+    {
+        return reinterpret_cast<iterator>(abase::append_uninitialized(n));
+    }
 
-public:
-    allocator_pod() : abase() {}
+    void insert(sstl_size_type n, sstl_size_type count, const T* buff)
+    {
+        return reinterpret_cast<iterator>(abase::insert(n, count, static_cast<void*>(buff)));
+    }
 
-    ~allocator_pod() {}
+    void append(sstl_size_type count, const T* buff)
+    {
+        return reinterpret_cast<iterator>(abase::append(count, static_cast<void*>(buff)));
+    }
 
-    void operator=(const allocator_pod<T>& v) {abase::operator=(v);}
+    void assign(const_iterator first, const_iterator last)
+    {
+        SSTL_ASSERT(first <= last);
+        clear();
+        append(static_cast<sstl_size_type>(last - first), first);
+    }
 
-    bool operator==(const allocator_pod<T>& v) const {return abase::operator==(v);}
-    bool operator!=(const allocator_pod<T>& v) const {return !abase::operator==(v);}
+    void assign(iterator first, iterator last)
+    {
+        assign(static_cast<const_iterator>(first), static_cast<const_iterator>(last));
+    }
 
-    iterator insert(sstl_size_type n, sstl_size_type count) {return reinterpret_cast<iterator>(abase::insert(n, count));}
-    iterator grow(sstl_size_type n) {return reinterpret_cast<iterator>(abase::grow(n));}
+    template
+        <class Iter>
+    void assign(Iter first, Iter last)
+    {
+        SSTL_ASSERT(first <= last);
+        clear();
+        iterator it = abase::append_uninitialized(last - first);
+        for ( ; last != first; ++first, ++it)
+            *it = *first;
+    }
+
+    void clear()
+    {
+        abase::clear();
+    }
 };
 
 /// Data allocator for complex data types with nontrivial constructor, destructor, etc.
 ///
 template
    <typename T>
-class allocator : allocator_typed<T>
+class allocator : public allocator_pod<T>
 {
 public:
 
-    typedef allocator_typed<T> abase;
+    typedef allocator_base<sizeof(T)> apod;
 
 public:
-    allocator() : abase() {}
 
+    allocator() : apod() {}
     ~allocator() {}
 
-    void operator=(const allocator<T>& v)
+    void operator=(const allocator& v)
     {
         if (this != &v)
         {
             clear();
-            iterator this_it = grow(v._size);
+            iterator this_it = append_uninitialized(v._size);
             const_iterator it = v.begin();
             const_iterator it_end = v.end();
             for ( ; it != it_end; ++it, ++this_it)
@@ -195,14 +237,14 @@ public:
         return true;
     }
 
-    bool operator==(const allocator<T>& v)
+    bool operator==(const allocator& v) const
     {
         if (this != &v)
         {
-            if (_size != v._size)
+            if (abase::_size != v._size)
                 return false;
-            const_iterator it = begin();
-            const_iterator itEnd = end();
+            const_iterator it = abase::begin();
+            const_iterator itEnd = abase::end();
             const_iterator itOther = v.begin();
             for ( ; it != itEnd; ++it, ++itOther)
                 if (*it != itOther)
@@ -211,10 +253,24 @@ public:
         return true;
     }
 
-    bool operator!=(const allocator<S>& v) const {return !operator==(v);}
+    bool operator!=(const allocator& v) const {return !operator==(v);}
 
-    T* insert(sstl_size_type n, sstl_size_type count) {return reinterpret_cast<const T*>(abase::insert(n, count);}
-    T* grow(sstl_size_type n) {return reinterpret_cast<const T*>(abase::grow(n);}
+    void clear();
+    iterator insert_uninitialized(sstl_size_type n, sstl_size_type count) {return reinterpret_cast<iterator>(abase::insert_uninitialized(n, count));}
+    iterator append_uninitialized(sstl_size_type n) {return reinterpret_cast<iterator>(abase::grow(n));}
+
+private:
+
+    static void _destroy_item(const_iterator it)
+    {
+        (*it).T::~T();
+    }
+
+    static void _destroy_items(const_iterator first, const_iterator last)
+    {
+        for (; first < last; ++first)
+            _destroy_item(first);
+    }
 };
 
 
@@ -229,7 +285,7 @@ void allocator_base<S>::operator=(const allocator_base<S>& v)
         const sstl_size_type size_of = v._size * S;
         if (_capacity < v._size)
         {
-            _delete_buffer();
+            delete [] _buffer;
             _buffer = new char[size_of];
             _capacity = v._size;
         }
@@ -257,7 +313,7 @@ void allocator_base<S>::reserve(sstl_size_type n)
     {
         char* b = new char[n * S];
         memcpy(b, _buffer, _size * S);
-        _delete_buffer();
+        delete [] _buffer;
         _buffer = b;
         _capacity = n;
     }
@@ -271,7 +327,7 @@ void allocator_base<S>::shrink_to_fit()
     {
         if (_size == 0)
         {
-            _delete_buffer();
+            delete [] _buffer;
             _buffer = NULL;
         }
         else
@@ -279,7 +335,7 @@ void allocator_base<S>::shrink_to_fit()
             const sstl_size_type size_of = _size * S;
             char* b = new char[size_of];
             memcpy(b, _buffer, size_of);
-            _delete_buffer();
+            delete [] _buffer;
             _buffer = b;
         }
         _capacity = _size;
@@ -288,7 +344,7 @@ void allocator_base<S>::shrink_to_fit()
 
 template
    <sstl_size_type S>
-char* allocator_base<S>::insert(sstl_size_type n, sstl_size_type count)
+char* allocator_base<S>::insert_uninitialized(sstl_size_type n, sstl_size_type count)
 {
     const sstl_size_type new_size = _size + count;
     const sstl_size_type offset_n = n * S;
@@ -299,15 +355,52 @@ char* allocator_base<S>::insert(sstl_size_type n, sstl_size_type count)
         char* b = new char[new_capacity * S];
         memcpy(b, _buffer, offset_n);
         memcpy(b + offset_n + offset_count, _buffer + offset_n, (_size - count) * S);
-        _delete_buffer();
+        delete [] _buffer;
         _buffer = b;
         _capacity = new_capacity;
     }
     else
-        memmove(b + offset_n + offset_count, _buffer + offset_n, (_size - count) * S);
+        memmove(_buffer + offset_n + offset_count, _buffer + offset_n, (_size - count) * S);
     _size = new_size;
     return _buffer + offset_n;
 }
+
+template
+   <sstl_size_type S>
+char* allocator_base<S>::append_uninitialized(sstl_size_type count)
+{
+    const sstl_size_type offset_n = _size * S;
+    const sstl_size_type new_size = _size + count;
+    if (new_size > _capacity)
+    {
+        sstl_size_type new_capacity = _adjust_capacity(new_size);
+        char* b = new char[new_capacity * S];
+        memcpy(b, _buffer, offset_n);
+        delete [] _buffer;
+        _buffer = b;
+        _capacity = new_capacity;
+    }
+    _size = new_size;
+    return _buffer + offset_n;
+}
+
+template
+   <sstl_size_type S>
+void allocator_base<S>::insert(sstl_size_type n, sstl_size_type count, void* buff)
+{
+    void* dest = insert_uninitialized(n, count);
+    memcpy(dest, buff, count * S);
+}
+
+template
+   <sstl_size_type S>
+void allocator_base<S>::append(sstl_size_type count, void* buff)
+{
+    void* dest = append_uninitialized(count);
+    memcpy(dest, buff, count * S);
+}
+
+} // namespace
 
 template
    <sstl_size_type S>
@@ -317,26 +410,5 @@ void allocator_base<S>::erase(sstl_size_type n, sstl_size_type count)
     const sstl_size_type offset = (n + count) * S;
     memmove(_buffer + n, _buffer + offset, _size * S - offset);
 }
-
-template
-   <sstl_size_type S>
-char* allocator_base<S>::grow(sstl_size_type n)
-{
-    SSTL_ASSERT(_size < n);
-    const sstl_size_type offset_size = n * S;
-    if (n > _capacity)
-    {
-        sstl_size_type new_capacity = _adjust_capacity(n);
-        char* b = new char[new_capacity * S];
-        memcpy(b, _buffer, offset_size);
-        _delete_buffer();
-        _buffer = b;
-        _capacity = new_capacity;
-    }
-    _size = n;
-    return _buffer + offset_size;
-}
-
-} // namespace
 
 #endif

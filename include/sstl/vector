@@ -2,34 +2,29 @@
 #ifndef _SSTL__VECTOR_INCLUDED
 #define _SSTL__VECTOR_INCLUDED
 
-#include "sstl_common.h"
-#include "atomic"
-#include "iterator"
 #include "allocator"
 
 namespace SSTL_NAMESPACE {
 
 // Differences:
 //   - non-standard allocator
-//   - vector::data() cannot be implemented for non-movable types
+//   - objects should be movable in memory
 
 template
-    <class T, class A>
+    <typename T, typename A = allocator_pod<T> >
 class vector
 {
 public:
-    typedef typename T value_type;
-    typedef typename A allocator_type;
+    typedef T value_type;
+    typedef A allocator_type;
     typedef sstl_size_type size_type;
     typedef sstl_difference_type difference_type;
-    typedef typename T& reference;
-    typedef const typename T& const_reference;
-    typedef typename T* pointer;
-    typedef const typename T* const_pointer;
-    typedef typename T* pointer;
-    typedef const typename T* const_pointer;
-    typedef typename T* iterator;
-    typedef const typename T* const_iterator;
+    typedef T& reference;
+    typedef const T& const_reference;
+    typedef T* pointer;
+    typedef const T* const_pointer;
+    typedef T* iterator;
+    typedef const T* const_iterator;
     typedef SSTL_NAMESPACE::reverse_iterator<iterator> reverse_iterator;
     typedef SSTL_NAMESPACE::reverse_iterator<const_iterator> const_reverse_iterator;
 
@@ -46,7 +41,19 @@ public:
     vector(size_type n, const_reference v)
         : _allocator()
     {
-        resize(n, v);
+        assign(n, v);
+    }
+
+    vector(const_iterator first, const_iterator last)
+        : _allocator()
+    {
+        assign(first, last);
+    }
+
+    vector(iterator first, iterator last)
+        : _allocator()
+    {
+        assign(first, last);
     }
 
     template
@@ -54,11 +61,7 @@ public:
     vector(Iter first, Iter last)
         : _allocator()
     {
-        SSTL_ASSERT(first <= last);
-        _allocator.resize(static_cast<size_type>(last - first));
-        iterator it = _allocator.begin();
-        for ( ; first < last; ++first, ++it)
-            *it = *first;
+        assign(first, last);
     }
 
     vector(const vector& x)
@@ -69,8 +72,21 @@ public:
 
     ~vector()
     {
-        _allocator._destroy_items(begin(), end());
+        clear();
     }
+
+    vector& operator=(const vector& v)
+    {
+        _allocator.operator=(v);
+        return *this;
+    }
+
+    bool operator==(const vector& v) const {return _allocator.operator==(v);}
+    bool operator!=(const vector& v) const {return _allocator.operator!=(v);}
+    bool operator< (const vector& v) const {return _allocator.operator<(v);}
+    bool operator> (const vector& v) const {return _allocator.operator>(v);}
+    bool operator<=(const vector& v) const {return _allocator.operator<=(v);}
+    bool operator>=(const vector& v) const {return _allocator.operator>=(v);}
 
     iterator begin() {return _allocator.begin();}
     iterator end()   {return _allocator.end();}
@@ -90,71 +106,60 @@ public:
     const_reverse_iterator crbegin() const {return const_reverse_iterator(_allocator.cend());}
     const_reverse_iterator crend() const   {return const_reverse_iterator(_allocator.cbegin());}
 
-    T& front()
+    reference front()
     {
         SSTL_ASSERT(!empty());
         return *_allocator.begin();
     }
-    const T& front() const
+    const_reference front() const
     {
         SSTL_ASSERT(!empty());
         return *_allocator.cbegin();
     }
 
-    T& back()
+    reference back()
     {
         SSTL_ASSERT(!empty());
         return *(_allocator.end() - 1);
     }
-    const T& back() const
+    const_reference back() const
     {
         SSTL_ASSERT(!empty());
         return *(_allocator.cend() - 1);
     }
+
+    pointer       data()       {return _allocator.begin();}
+    const_pointer data() const {return _allocator.cbegin();}
 
     /// Maximum possible size of the vector, as determined by the limits of the involved types
     ///
     /// Different from C++ standard in SSTL this method is static, callable without instance.
     /// The real maximum size can be limited by the available memory.
     ///
-    static SSTL_CONSTEXPR size_type max_size()
-    {
-        return numeric_limits<size_type>::max() / 2 / sizeof(T);
-    }
+    static SSTL_CONSTEXPR size_type max_size() {return allocator_type::max_size();}
 
-    size_type size() const
-    {
-        return static_cast<size_type>(_allocator.size());
-    }
-
-    bool empty() const
-    {
-        return _allocator.size() == 0;
-    }
-
-    size_type capacity() const
-    {
-        return static_cast<size_type>(_allocator.capacity());
-    }
+    bool      empty()    const {return _allocator.size() == 0;}
+    size_type size()     const {return static_cast<size_type>(_allocator.size());}
+    size_type capacity() const {return static_cast<size_type>(_allocator.capacity());}
 
     void reserve(size_type n) {_allocator.reserve(n);}
+    void shrink_to_fit()      {_allocator.shrink_to_fit();}
 
-    void shrink_to_fit() {_allocator.shrink_to_fit();}
-
-    vector& operator=(const vector& v)
+    void assign(const_iterator first, const_iterator last)
     {
-        _allocator.operator=(v);
-        return *this;
+        _iterator.assign(first, last);
+    }
+
+    void assign(iterator first, iterator last)
+    {
+        _iterator.assign(first, last);
     }
 
     template
         <class Iter>
     void assign(Iter first, Iter last)
     {
-        SSTL_ASSERT(first <= last);
-        _destroy_items(begin(), end());
-        _allocator.resize(last - first);
-        _copy_items(begin(), first, last);
+        _iterator.assign(first, last);
     }
 
     void assign(size_type n, const_reference v)
@@ -162,40 +167,46 @@ public:
 
     }
 
-    allocator_type& get_allocator()
-    {
-        return _allocator;
-    }
-    const allocator_type& get_allocator() const
-    {
-        return _allocator;
-    }
+    allocator_type&       get_allocator()      {return _allocator;}
+    const allocator_type& get_allocator() const{return _allocator;}
 
     reference       operator[](size_type n)       {return _allocator.at(n);}
     const_reference operator[](size_type n) const {return _allocator.at(n);}
+
+    ///@{
+    /// Access vector element by index.
+    ///
+    /// Different from standard, the behavior is the same as operator[],
+    /// no exception is thrown but there is a debug check.
+    ///
     reference       at(size_type n)               {return _allocator.at(n);}
     const_reference at(size_type n) const         {return _allocator.at(n);}
+    ///@}
 
     void push_back(const_reference v)
     {
-        _allocator.resize(size() + 1);
+        *_allocator.append_uninitialized(1) = v;
     }
 
     void pop_back()
     {
         SSTL_ASSERT(!empty());
-        _destroy_item(end() - 1);
-        _allocator.resize(size() - 1);
+        _allocator.erase(size() - 1);
     }
 
-    iterator insert(const_iterator n, const_reference v)
+    iterator insert(const_iterator pos, const_reference v)
+    {
+
+    }
+
+    iterator insert(const_iterator pos, size_type count, const_reference v)
     {
 
     }
 
     template
         <class Iter>
-    iterator insert(const_iterator n, Iter first, Iter last)
+    iterator insert(const_iterator pos, Iter first, Iter last)
     {
 
     }
@@ -212,33 +223,16 @@ public:
         _allocator.erase(begin() - size() - (last - first));
     }
 
-    void clear()
-    {
-        _destroy_items(begin(), end());
-        // let the allocator destructor clear the space
-    }
+    void clear() {_allocator.clear();}
 
     void resize(size_type new_size);
     void resize(size_type new_size, const_reference v);
 
-    void swap(vector<T,A>&);
+    void swap(vector& v) {_allocator.swap(v);}
 
 private:
 
-    static void _destroy_item(const_iterator it)
-    {
-        (*it).T::~T();
-    }
-
-    static void _destroy_items(const_iterator first, const_iterator last)
-    {
-        for (; first < last; ++first)
-            _destroy_item(first);
-    }
-
-private:
-
-    typename A _allocator;
+    allocator_type _allocator;
 };
 
 } // namespace
