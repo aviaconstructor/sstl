@@ -209,8 +209,8 @@ string::iterator string::insert(const_iterator where, const_iterator input_first
 {
     SSTL_ASSERT(input_first <= input_last);
     SSTL_ASSERT(where >= _bytes && where <= _bytes + size());
-    size_type pos = where - _bytes;
-    size_type count = input_last - input_first;
+    size_type pos = static_cast<size_type>(where - _bytes);
+    size_type count = static_cast<size_type>(input_last - input_first);
     insert(pos, input_first, count);
     return begin() + pos + count;
 }
@@ -295,9 +295,9 @@ string& string::replace(const_iterator first, const_iterator last, const_iterato
     SSTL_ASSERT(first >= _bytes);
     SSTL_ASSERT(last <= _bytes + size());
     SSTL_ASSERT(input_first <= input_last);
-    size_type pos = first - _bytes;
-    size_type count = last - first;
-    size_type str_count = input_last - input_first;
+    size_type pos = static_cast<size_type>(first - _bytes);
+    size_type count = static_cast<size_type>(last - first);
+    size_type str_count = static_cast<size_type>(input_last - input_first);
     return replace(pos, count, input_first, str_count);
 }
 
@@ -504,7 +504,7 @@ string string::operator+(char c) const
 
 string string::operator+(const char* s) const
 {
-    return _op_plus_right(s, strlen(s));
+    return _op_plus_right(s, static_cast<size_type>(strlen(s)));
 }
 
 string string::operator+(const string& s) const
@@ -519,7 +519,7 @@ string operator+(char c, const string& s2)
 
 string operator+(const char* s1, const string& s2)
 {
-    return s2._op_plus_left(s1, strlen(s1));
+    return s2._op_plus_left(s1, static_cast<string::size_type>(strlen(s1)));
 }
 
 string::size_type string::find(char ch, size_type pos) const
@@ -528,7 +528,7 @@ string::size_type string::find(char ch, size_type pos) const
    const_iterator i_end = cend();
    for ( ; i < i_end; ++i) // when pos >= size() return npos, as specified
       if (*i == ch)
-         return i - cbegin();
+         return static_cast<size_type>(i - cbegin());
    return npos;
 }
 
@@ -951,7 +951,7 @@ void string::intern()
 
 string string::intern_create(const char* s)
 {
-    return _intern_holder::get_global()->add(s, strlen(s));
+    return _intern_holder::get_global()->add(s, static_cast<size_type>(strlen(s)));
 }
 
 string string::intern_create(const char* s, size_type size)

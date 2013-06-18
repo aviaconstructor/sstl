@@ -590,12 +590,12 @@ public:
 
     size_type find(char ch, size_type pos = 0) const;
     size_type find(const char* s, size_type pos, size_type count) const;
-    size_type find(const char* s, size_type pos = 0) const     {return find(s, pos, strlen(s));}
+    size_type find(const char* s, size_type pos = 0) const     {return find(s, pos, static_cast<size_type>(strlen(s)));}
     size_type find(const string& str, size_type pos = 0) const {return find(str.data(), pos, str.size());}
 
     size_type rfind(char ch, size_type pos = string::npos) const;
     size_type rfind(const char* s, size_type pos, size_type count) const;
-    size_type rfind(const char* s, size_type pos = string::npos) const     {return rfind(s, pos, strlen(s));}
+    size_type rfind(const char* s, size_type pos = string::npos) const     {return rfind(s, pos, static_cast<size_type>(strlen(s)));}
     size_type rfind(const string& str, size_type pos = string::npos) const {return rfind(str.data(), pos, str.size());}
 
     bool is_shared() const
