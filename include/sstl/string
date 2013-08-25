@@ -486,7 +486,12 @@ public:
     {
         return s2.operator==(s1);
     }
+
     bool operator!=(const string& s) const
+    {
+        return !operator==(s);
+    }
+    bool operator!=(const char* s) const
     {
         return !operator==(s);
     }
@@ -546,6 +551,63 @@ public:
     {
         return s2.compare(s1) < 0;
     }
+
+#if SSTL_STL_INTEROPERABILITY
+
+    int compare(const std::string& str) const
+    {
+       return compare(str.data(), str.size());
+    }
+    bool operator==(const std::string& s) const
+    {
+       return compare(s.data(), s.size()) == 0;
+    }
+    friend bool operator==(const std::string& s1, const string& s2)
+    {
+       return s2.compare(s1.data(), s1.size()) == 0;
+    }
+    bool operator!=(const std::string& s) const
+    {
+        return !operator==(s);
+    }
+    friend bool operator!=(const std::string& s1, const string& s2)
+    {
+       return !s2.operator==(s1);
+    }
+    bool operator<(const std::string& s) const
+    {
+       return compare(s.data(), s.size()) < 0;
+    }
+    friend bool operator<(const std::string& s1, const string& s2)
+    {
+        return s2.compare(s1.data(), s1.size()) >= 0;
+    }
+    bool operator<=(const std::string& s) const
+    {
+       return compare(s.data(), s.size()) <= 0;
+    }
+    friend bool operator<=(const std::string& s1, const string& s2)
+    {
+        return s2.compare(s1.data(), s1.size()) > 0;
+    }
+    bool operator>(const std::string& s) const
+    {
+       return compare(s.data(), s.size()) > 0;
+    }
+    friend bool operator>(const std::string& s1, const string& s2)
+    {
+        return s2.compare(s1.data(), s1.size()) <= 0;
+    }
+    bool operator>=(const std::string& s) const
+    {
+       return compare(s.data(), s.size()) >= 0;
+    }
+    friend bool operator>=(const std::string& s1, const string& s2)
+    {
+        return s2.compare(s1.data(), s1.size()) < 0;
+    }
+
+#endif
 
     string operator+(char c) const;
     string operator+(const char* s) const;
