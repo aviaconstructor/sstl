@@ -38,6 +38,8 @@ public:
 
     // Private shared constant string buffer.
     //
+    // This type has to be a POD because it can be statically initialized
+    //
     struct _buffer_type
     {
     public: // Data:
@@ -73,29 +75,6 @@ public:
 
     public:
 
-        // Object default constructor used to create an empty string buffer.
-        //
-        _buffer_type()
-            :
-              _hash(0),
-              _capacity(16),
-              _size(0),
-              _ref_count(1) // never delete static empty string
-        {
-            SSTL_STATIC_ASSERT(sizeof(_buffer_type) == 32, "Buffer structure has unexpected size"); // ensure nice alignment
-        }
-
-        // Object constructor with capacity and size specified
-        //
-        _buffer_type(unsigned capacity, unsigned size)
-            :
-              _hash(0),
-              _capacity(capacity),
-              _size(size),
-              _ref_count(0)
-        {
-        }
-
         void _ref_increment() const
         {
             SSTL_NAMESPACE::atomic_int::static_fetch_and_increment(&_ref_count);
@@ -106,12 +85,6 @@ public:
             if ( SSTL_NAMESPACE::atomic_int::static_fetch_and_decrement(&_ref_count) <= 0 )
                 delete this;
         }
-
-    private:
-
-        // Disable those
-        _buffer_type(const _buffer_type&);
-        _buffer_type& operator=(const _buffer_type&);
     };
 
 public: // Constants:

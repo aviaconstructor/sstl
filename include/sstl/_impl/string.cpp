@@ -4,7 +4,7 @@
 
 namespace SSTL_NAMESPACE {
 
-string::_buffer_type string::_empty_string_buffer;
+string::_buffer_type string::_empty_string_buffer = {0, 16, 0, 1}; // Has to be a POD
 string string::_empty_string(&string::_empty_string_buffer);
 
 inline sstl_size_type _adjust_capacity(sstl_size_type size)
