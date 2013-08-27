@@ -529,15 +529,15 @@ public:
 
     int compare(const std::string& str) const
     {
-       return compare(str.data(), str.size());
+       return compare(str.data(), static_cast<size_type>(str.size()));
     }
     bool operator==(const std::string& s) const
     {
-       return compare(s.data(), s.size()) == 0;
+       return compare(s.data(), static_cast<size_type>(s.size())) == 0;
     }
     friend bool operator==(const std::string& s1, const string& s2)
     {
-       return s2.compare(s1.data(), s1.size()) == 0;
+       return s2.compare(s1.data(), static_cast<size_type>(s1.size())) == 0;
     }
     bool operator!=(const std::string& s) const
     {
@@ -549,35 +549,35 @@ public:
     }
     bool operator<(const std::string& s) const
     {
-       return compare(s.data(), s.size()) < 0;
+       return compare(s.data(), static_cast<size_type>(s.size())) < 0;
     }
     friend bool operator<(const std::string& s1, const string& s2)
     {
-        return s2.compare(s1.data(), s1.size()) >= 0;
+        return s2.compare(s1.data(), static_cast<size_type>(s1.size())) >= 0;
     }
     bool operator<=(const std::string& s) const
     {
-       return compare(s.data(), s.size()) <= 0;
+       return compare(s.data(), static_cast<size_type>(s.size())) <= 0;
     }
     friend bool operator<=(const std::string& s1, const string& s2)
     {
-        return s2.compare(s1.data(), s1.size()) > 0;
+        return s2.compare(s1.data(), static_cast<size_type>(s1.size())) > 0;
     }
     bool operator>(const std::string& s) const
     {
-       return compare(s.data(), s.size()) > 0;
+       return compare(s.data(), static_cast<size_type>(s.size())) > 0;
     }
     friend bool operator>(const std::string& s1, const string& s2)
     {
-        return s2.compare(s1.data(), s1.size()) <= 0;
+        return s2.compare(s1.data(), static_cast<size_type>(s1.size())) <= 0;
     }
     bool operator>=(const std::string& s) const
     {
-       return compare(s.data(), s.size()) >= 0;
+       return compare(s.data(), static_cast<size_type>(s.size())) >= 0;
     }
     friend bool operator>=(const std::string& s1, const string& s2)
     {
-        return s2.compare(s1.data(), s1.size()) < 0;
+        return s2.compare(s1.data(), static_cast<size_type>(s1.size())) < 0;
     }
 
 #endif
