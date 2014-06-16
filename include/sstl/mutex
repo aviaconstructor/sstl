@@ -27,7 +27,7 @@ public:
         ::InitializeCriticalSection(&_native_handle);
     }
 
-    ~_mutex_base()
+    ~_mutex()
     {
         _verify_not_destroyed();
         ::DeleteCriticalSection(&_native_handle);

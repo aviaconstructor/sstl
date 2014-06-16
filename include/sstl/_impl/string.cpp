@@ -909,7 +909,7 @@ void _intern_holder::resize(int new_capacity)
             {
                 SSTL_ASSERT(buff->_hash != 0);
                 if (buff->_ref_count == 0) // orphaned item to garbage collect
-                    delete buff;
+                    delete [] buff;
                 else
                 {
                     SSTL_ASSERT(buff->_ref_count > 0);
@@ -938,7 +938,7 @@ void _intern_holder::resize(int new_capacity)
         SSTL_ASSERT(_count >= new_count);
         _count = new_count;
     }
-    delete _buffers;
+    delete [] _buffers;
     _buffers = new_buffers;
     _capacity = new_capacity;
 }

@@ -128,7 +128,8 @@ protected:
 /// They should have no constructor or destructor, should be movable in memory,
 /// and their initialization is done by zeroing them out.
 ///
-/// The implementation is a thin type casting layer above the typed allocator
+/// The implementation is a thin type casting layer above the typed allocator,
+/// and moving and copying of items is efficiently done by moving memory.
 ///
 template
    <typename T>
@@ -400,8 +401,6 @@ void allocator_base<S>::append(sstl_size_type count, void* buff)
     memcpy(dest, buff, count * S);
 }
 
-} // namespace
-
 template
    <sstl_size_type S>
 void allocator_base<S>::erase(sstl_size_type n, sstl_size_type count)
@@ -410,5 +409,7 @@ void allocator_base<S>::erase(sstl_size_type n, sstl_size_type count)
     const sstl_size_type offset = (n + count) * S;
     memmove(_buffer + n, _buffer + offset, _size * S - offset);
 }
+
+} // namespace
 
 #endif

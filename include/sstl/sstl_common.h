@@ -17,7 +17,10 @@
 #include "sstl_types.h"
 
 #if defined(_WIN32)  // Generic Windows, both 32 and 64
-    #include <winbase.h>
+    #if !defined(_WINDOWS_) // avoid relying on WIN32_LEAN_AND_MEAN define
+       #define WIN32_LEAN_AND_MEAN
+       #include <windows.h>
+    #endif
 #else
     #include <unistd.h>
 #endif
